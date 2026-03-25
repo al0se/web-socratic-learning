@@ -1,0 +1,325 @@
+<script setup lang='ts'>
+import type { ConfigState } from './model'
+import { fetchChatConfig, fetchUpdateSite } from '@/api'
+import { useAuthStore } from '@/store'
+import { SiteConfig } from './model'
+
+const { t } = useI18n()
+const authStore = useAuthStore()
+
+const ms = useMessage()
+
+const loading = ref(false)
+const saving = ref(false)
+
+const config = ref(new SiteConfig())
+
+interface ExternalChatSite {
+  name: string
+  url: string
+}
+
+const externalChatSite = ref<ExternalChatSite[]>([])
+
+async function fetchConfig() {
+  try {
+    loading.value = true
+    const { data } = await fetchChatConfig<ConfigState>()
+    config.value = data.siteConfig ? data.siteConfig : new SiteConfig()
+
+    // Parse external chat sites list
+    if (config.value.externalChatSites && Array.isArray(config.value.externalChatSites)) {
+      externalChatSite.value = config.value.externalChatSites.map((item: any) => ({
+        name: item.name || '',
+        url: item.url || '',
+      }))
+    }
+    else {
+      externalChatSite.value = []
+    }
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function addExternalChatSite() {
+  externalChatSite.value.push({ name: '', url: '' })
+}
+
+function removeExternalChatSite(index: number) {
+  externalChatSite.value.splice(index, 1)
+}
+
+async function updateSiteInfo(site?: SiteConfig) {
+  if (!site)
+    return
+
+  // Set external chat sites list
+  const validSites = externalChatSite.value.filter(m => m.name && m.url)
+  site.externalChatSites = validSites.length > 0 ? validSites : undefined
+
+  saving.value = true
+  try {
+    const { data } = await fetchUpdateSite(site)
+    await authStore.getSession()
+    config.value = data
+
+    // Update external chat sites list display
+    if (data.externalChatSites && Array.isArray(data.externalChatSites)) {
+      externalChatSite.value = data.externalChatSites.map((item: any) => ({
+        name: item.name || '',
+        url: item.url || '',
+      }))
+    }
+    else {
+      externalChatSite.value = []
+    }
+
+    ms.success(t('common.success'))
+  }
+  catch (error: any) {
+    ms.error(error.message)
+  }
+  saving.value = false
+}
+
+onMounted(() => {
+  fetchConfig()
+})
+</script>
+
+<template>
+  <NSpin :show="loading">
+    <div class="p-4 space-y-5 min-h-[200px]">
+      <div class="space-y-6">
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.siteTitle') }}</span>
+          <div class="flex-1">
+            <NInput
+              :value="config && config.siteTitle" placeholder=""
+              @input="(val) => { if (config) config.siteTitle = val }"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.siteDomain') }}</span>
+          <div class="flex-1">
+            <NInput
+              :value="config && config.siteDomain" placeholder=""
+              @input="(val) => { if (config) config.siteDomain = val }"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.loginEnabled') }}</span>
+          <div class="flex-1">
+            <NSwitch
+              :round="false"
+              :disabled="config && config.loginEnabled"
+              :value="config && config.loginEnabled"
+              @update:value="(val) => { if (config) config.loginEnabled = val }"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.loginSalt') }}</span>
+          <div class="flex-1">
+            <NInput
+              :value="config && config.loginSalt" :placeholder="t('setting.loginSaltTip')"
+              @input="(val) => { if (config) config.loginSalt = val }"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.registerEnabled') }}</span>
+          <div class="flex-1">
+            <NSwitch
+              :round="false"
+              :value="config && config.registerEnabled"
+              @update:value="(val) => { if (config) config.registerEnabled = val }"
+            />
+          </div>
+        </div>
+        <div v-show="config && config.registerEnabled" class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.registerReview') }}</span>
+          <div class="flex-1">
+            <NSwitch
+              :round="false"
+              :value="config && config.registerReview"
+              @update:value="(val) => { if (config) config.registerReview = val }"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.registerMails') }}</span>
+          <div class="flex-1">
+            <NInput
+              :value="config && config.registerMails" :placeholder="t('setting.registerReviewTip')"
+              @input="(val) => { if (config) config.registerMails = val }"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.chatModels') }}</span>
+          <div class="flex-1">
+            <NInput
+              :value="config && config.chatModels"
+              placeholder="英文逗号分割 | English comma separated"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 4 }"
+              @input="(val) => { if (config) config.chatModels = val }"
+            />
+          </div>
+        </div>
+        <div class="space-y-4">
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.externalChatSites') }}</span>
+            <div class="flex-1">
+              <NButton size="small" @click="addExternalChatSite">
+                {{ t('common.add') }}
+              </NButton>
+            </div>
+          </div>
+          <div v-for="(model, index) in externalChatSite" :key="index" class="flex items-center space-x-2 pl-[100px]">
+            <NInput
+              v-model:value="model.name"
+              :placeholder="t('setting.externalModelName')"
+              style="flex: 1;"
+            />
+            <NInput
+              v-model:value="model.url"
+              placeholder="URL"
+              style="flex: 2;"
+            />
+            <NButton size="small" type="error" @click="removeExternalChatSite(index)">
+              {{ t('common.delete') }}
+            </NButton>
+          </div>
+        </div>
+        <!-- 增加新注册用户的全局数量设置 -->
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.globalAmount') }}</span>
+          <div class="flex-1">
+            <NInputNumber
+              v-model:value="config.globalAmount" placeholder=""
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.usageCountLimit') }}</span>
+          <div class="flex-1">
+            <NSwitch
+              :round="false"
+              :value="config && config.usageCountLimit"
+              @update:value="(val) => { if (config) config.usageCountLimit = val }"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.showWatermark') }}</span>
+          <div class="flex-1">
+            <NSwitch
+              :round="false"
+              :value="config && config.showWatermark"
+              @update:value="(val) => { if (config) config.showWatermark = val }"
+            />
+          </div>
+        </div>
+        <!-- S3存储配置 -->
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.s3Enabled') }}</span>
+          <div class="flex-1">
+            <NSwitch
+              :round="false"
+              :value="config && config.s3Enabled"
+              @update:value="(val) => { if (config) config.s3Enabled = val }"
+            />
+          </div>
+        </div>
+        <div v-show="config && config.s3Enabled" class="space-y-4">
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.s3AccessKeyId') }}</span>
+            <div class="flex-1">
+              <NInput
+                :value="config && config.s3AccessKeyId"
+                :placeholder="t('setting.s3AccessKeyId')"
+                type="password"
+                show-password-on="click"
+                @input="(val) => { if (config) config.s3AccessKeyId = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.s3SecretAccessKey') }}</span>
+            <div class="flex-1">
+              <NInput
+                :value="config && config.s3SecretAccessKey"
+                :placeholder="t('setting.s3SecretAccessKey')"
+                type="password"
+                show-password-on="click"
+                @input="(val) => { if (config) config.s3SecretAccessKey = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.s3Region') }}</span>
+            <div class="flex-1">
+              <NInput
+                :value="config && config.s3Region"
+                :placeholder="t('setting.s3Region') || 'us-east-1'"
+                @input="(val) => { if (config) config.s3Region = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.s3Bucket') }}</span>
+            <div class="flex-1">
+              <NInput
+                :value="config && config.s3Bucket"
+                :placeholder="t('setting.s3Bucket')"
+                @input="(val) => { if (config) config.s3Bucket = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.s3Endpoint') }}</span>
+            <div class="flex-1">
+              <NInput
+                :value="config && config.s3Endpoint"
+                :placeholder="t('setting.s3EndpointTip') || '可选，用于MinIO等自定义端点'"
+                @input="(val) => { if (config) config.s3Endpoint = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.s3PathPrefix') }}</span>
+            <div class="flex-1">
+              <NInput
+                :value="config && config.s3PathPrefix"
+                :placeholder="t('setting.s3PathPrefixTip') || '可选，默认为 uploads/'"
+                @input="(val) => { if (config) config.s3PathPrefix = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.s3CustomDomain') }}</span>
+            <div class="flex-1">
+              <NInput
+                :value="config && config.s3CustomDomain"
+                :placeholder="t('setting.s3CustomDomainTip') || '可选，自定义域名（如：https://cdn.example.com）'"
+                @input="(val) => { if (config) config.s3CustomDomain = val }"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]" />
+          <NButton :loading="saving" type="primary" @click="updateSiteInfo(config)">
+            {{ t('common.save') }}
+          </NButton>
+        </div>
+      </div>
+    </div>
+  </NSpin>
+</template>

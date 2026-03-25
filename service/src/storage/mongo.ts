@@ -1,0 +1,1248 @@
+import type { Collection, Filter, WithId } from 'mongodb'
+import type {
+  BuiltInPrompt,
+  ChatOptions,
+  Config,
+  GiftCard,
+  ImageUsageItem,
+  KeyConfig,
+  SearchResult,
+  UsageResponse,
+  UserPrompt,
+} from './model'
+import * as process from 'node:process'
+import dayjs from 'dayjs'
+import { MongoClient, ObjectId } from 'mongodb'
+import { hasAnyRole } from '../utils/is'
+import { md5 } from '../utils/security'
+import { getCacheApiKeys, getCacheConfig } from './config'
+import { ChatInfo, ChatRoom, ChatUsage, Status, UserConfig, UserInfo, UserRole } from './model'
+
+let client: MongoClient
+let dbName: string
+let isInitialized = false
+
+// Collections - initialized in initializeMongoDB()
+let chatCol: Collection<ChatInfo>
+let roomCol: Collection<ChatRoom>
+let userCol: Collection<UserInfo>
+let configCol: Collection<Config>
+let usageCol: Collection<ChatUsage>
+let keyCol: Collection<KeyConfig>
+let builtInPromptCol: Collection<BuiltInPrompt>
+let userPromptCol: Collection<UserPrompt>
+let redeemCol: Collection<GiftCard>
+
+/**
+ * Initialize all database indexes
+ * This should be called once when the application starts
+ * Note: createIndex is idempotent - it won't fail if index already exists
+ */
+
+async function initializeIndexes() {
+  try {
+    // ============================================
+    // chat_room collection indexes
+    // ============================================
+    // Index for /api/chatrooms: getChatRooms(userId)
+    // Query: { userId, status: { $ne: Status.Deleted } }
+    await roomCol.createIndex({ userId: 1, status: 1 }, { name: 'idx_userId_status' })
+
+    // Index for getChatRoom: { userId, roomId, status: { $ne: Status.Deleted } }
+    await roomCol.createIndex({ userId: 1, roomId: 1, status: 1 }, { name: 'idx_userId_roomId_status' })
+
+    // Index for existsChatRoom: { roomId, userId }
+    await roomCol.createIndex({ roomId: 1, userId: 1 }, { name: 'idx_roomId_userId' })
+
+    // Index for getChatRoomsCount aggregation lookup
+    await roomCol.createIndex({ roomId: 1 }, { name: 'idx_roomId' })
+
+    globalThis.console.log('✓ chat_room collection indexes created')
+
+    // ============================================
+    // chat collection indexes
+    // ============================================
+    // Index for /api/chat-history: getChats(roomId, lastId, all)
+    // Query: { roomId, uuid: { $lt: lastId }, status: { $ne: Status.Deleted } }
+    // Sort: { dateTime: -1 }
+    await chatCol.createIndex(
+      { roomId: 1, uuid: -1, dateTime: -1, status: 1 },
+      { name: 'idx_roomId_uuid_dateTime_status' },
+    )
+
+    // Alternative index for queries without status filter
+    await chatCol.createIndex(
+      { roomId: 1, uuid: -1, dateTime: -1 },
+      { name: 'idx_roomId_uuid_dateTime' },
+    )
+
+    // Index for getChat: { roomId, uuid }
+    await chatCol.createIndex({ roomId: 1, uuid: 1 }, { name: 'idx_roomId_uuid' })
+
+    // Index for getChatByMessageId: { 'options.messageId': messageId }
+    await chatCol.createIndex({ 'options.messageId': 1 }, { name: 'idx_options_messageId' })
+
+    // Index for getChatRoomsCount aggregation lookup
+    await chatCol.createIndex({ roomId: 1, dateTime: -1 }, { name: 'idx_roomId_dateTime' })
+
+    // Index for deleteAllChatRooms: updateMany({ userId, status: Status.Normal }, ...)
+    await chatCol.createIndex({ userId: 1, status: 1 }, { name: 'idx_userId_status' })
+
+    globalThis.console.log('✓ chat collection indexes created')
+
+    // ============================================
+    // user collection indexes
+    // ============================================
+    // Index for getUser: { email }
+    try {
+      await userCol.createIndex({ email: 1 }, { name: 'idx_email', unique: true })
+    }
+    catch (error: any) {
+      // Ignore error if unique index already exists
+      if (!error.message?.includes('E11000') && !error.message?.includes('duplicate key')) {
+        throw error
+      }
+    }
+
+    // Index for getUsers: { status: { $ne: Status.Deleted } } with sort by createTime
+    await userCol.createIndex({ status: 1, createTime: -1 }, { name: 'idx_status_createTime' })
+
+    globalThis.console.log('✓ user collection indexes created')
+
+    // ============================================
+    // chat_usage collection indexes
+    // ============================================
+    // Index for getUserStatisticsByDay: { dateTime, userId }
+    await usageCol.createIndex({ dateTime: 1, userId: 1 }, { name: 'idx_dateTime_userId' })
+
+    globalThis.console.log('✓ chat_usage collection indexes created')
+
+    // ============================================
+    // giftcards collection indexes
+    // ============================================
+    // Index for getAmtByCardNo: { cardno }
+    try {
+      await redeemCol.createIndex({ cardno: 1 }, { name: 'idx_cardno', unique: true })
+    }
+    catch (error: any) {
+      // Ignore error if unique index already exists
+      if (!error.message?.includes('E11000') && !error.message?.includes('duplicate key')) {
+        throw error
+      }
+    }
+
+    globalThis.console.log('✓ giftcards collection indexes created')
+
+    // ============================================
+    // user_prompt collection indexes
+    // ============================================
+    // Index for getUserPromptList: { userId }
+    await userPromptCol.createIndex({ userId: 1 }, { name: 'idx_userId' })
+    // Unique per user for prompt title (key).
+    try {
+      await userPromptCol.createIndex({ userId: 1, title: 1 }, { name: 'uidx_userId_title', unique: true })
+    }
+    catch (error: any) {
+      if (!error.message?.includes('E11000') && !error.message?.includes('duplicate key')) {
+        throw error
+      }
+    }
+
+    globalThis.console.log('✓ user_prompt collection indexes created')
+
+    // ============================================
+    // built_in_prompt collection indexes
+    // ============================================
+    // Unique prompt title (key).
+    try {
+      await builtInPromptCol.createIndex({ title: 1 }, { name: 'uidx_title', unique: true })
+    }
+    catch (error: any) {
+      if (!error.message?.includes('E11000') && !error.message?.includes('duplicate key')) {
+        throw error
+      }
+    }
+
+    globalThis.console.log('✓ built_in_prompt collection indexes created')
+
+    // ============================================
+    // key_config collection indexes
+    // ============================================
+    // Index for getKeys: { status: { $ne: Status.Disabled } }
+    await keyCol.createIndex({ status: 1 }, { name: 'idx_status' })
+
+    globalThis.console.log('✓ key_config collection indexes created')
+
+    globalThis.console.log('✓ All database indexes initialized successfully')
+  }
+  catch (error: any) {
+    // Log error but don't throw - allow application to start even if index creation fails
+    globalThis.console.error('⚠ Warning: Error initializing database indexes:', error.message)
+    globalThis.console.error('  Application will continue to start. You may need to create indexes manually.')
+  }
+}
+
+/**
+ * Initialize MongoDB connection and indexes
+ * This should be called once when the application starts
+ */
+export async function initializeMongoDB() {
+  if (isInitialized) {
+    return
+  }
+
+  try {
+    const url = process.env.MONGODB_URL
+    if (!url) {
+      throw new Error('MONGODB_URL environment variable is not set')
+    }
+
+    // Initialize MongoDB client
+    client = new MongoClient(url)
+    const parsedUrl = new URL(url)
+    dbName = (parsedUrl.pathname && parsedUrl.pathname !== '/') ? parsedUrl.pathname.substring(1) : 'chatgpt'
+
+    // Connect to MongoDB
+    await client.connect()
+    globalThis.console.log('✓ MongoDB connected successfully')
+
+    // Initialize collections
+    const db = client.db(dbName)
+    chatCol = db.collection<ChatInfo>('chat')
+    roomCol = db.collection<ChatRoom>('chat_room')
+    userCol = db.collection<UserInfo>('user')
+    configCol = db.collection<Config>('config')
+    usageCol = db.collection<ChatUsage>('chat_usage')
+    keyCol = db.collection<KeyConfig>('key_config')
+    builtInPromptCol = db.collection<BuiltInPrompt>('built_in_prompt')
+    userPromptCol = db.collection<UserPrompt>('user_prompt')
+    redeemCol = db.collection<GiftCard>('giftcards')
+
+    // Initialize indexes
+    await initializeIndexes()
+
+    isInitialized = true
+  }
+  catch (error: any) {
+    globalThis.console.error('✗ Error initializing MongoDB:', error.message)
+    // Don't throw - allow application to continue
+    // MongoDB operations will fail gracefully if connection is not established
+  }
+}
+
+/**
+ * Insert chat message.
+ * @param uuid
+ * @param text Prompt or response content
+ * @param roomId
+ * @param options
+ * @returns model
+ */
+
+// Fetch and compare redeem codes.
+export async function getAmtByCardNo(redeemCardNo: string) {
+  // const chatInfo = new ChatInfo(roomId, uuid, text, options)
+  const amt_isused = await redeemCol.findOne({ cardno: redeemCardNo.trim() }) as GiftCard
+  return amt_isused
+}
+// Update redeem code info after redemption.
+export async function updateGiftCard(redeemCardNo: string, userId: string) {
+  return await redeemCol.updateOne({ cardno: redeemCardNo.trim() }, { $set: { redeemed: 1, redeemed_date: new Date().toLocaleString(), redeemed_by: userId } })
+}
+// Update user usage after a chat is used.
+export async function updateAmountMinusOne(userId: string) {
+  const result = await userCol.updateOne({ _id: new ObjectId(userId) }, { $inc: { useAmount: -1 } })
+  return result.modifiedCount > 0
+}
+
+// update giftcards database
+export async function updateGiftCards(data: GiftCard[], overRide = true) {
+  if (overRide) {
+    // i am not sure is there a drop option for the node driver reference https://mongodb.github.io/node-mongodb-native/6.4/
+    // await redeemCol.deleteMany({})
+    await redeemCol.drop()
+  }
+  const insertResult = await redeemCol.insertMany(data)
+  return insertResult
+}
+
+export async function insertChat(uuid: number, text: string, images: string[], roomId: number, model: string, options?: ChatOptions) {
+  const chatInfo = new ChatInfo(roomId, uuid, text, images, model, options)
+  await chatCol.insertOne(chatInfo)
+  return chatInfo
+}
+
+export async function getChat(roomId: number, uuid: number) {
+  return await chatCol.findOne({ roomId, uuid })
+}
+
+export async function getChatByMessageId(messageId: string) {
+  return await chatCol.findOne({ 'options.messageId': messageId })
+}
+
+export async function updateChat(
+  chatId: string,
+  reasoning: string,
+  response: string,
+  messageId: string,
+  model: string,
+  usage: UsageResponse,
+  previousResponse?: [],
+  tool_images?: string[],
+  tool_calls?: Array<{ type: string, result?: any }>,
+  editImageId?: string,
+  updateDateTime?: boolean,
+) {
+  const query = { _id: new ObjectId(chatId) }
+  const update: any = {
+    $set: {
+      'reasoning': reasoning,
+      'response': response,
+      'model': model || '',
+      'options.messageId': messageId,
+      'options.prompt_tokens': usage?.prompt_tokens,
+      'options.completion_tokens': usage?.completion_tokens,
+      'options.total_tokens': usage?.total_tokens,
+      'options.estimated': usage?.estimated,
+    },
+  }
+
+  if (previousResponse)
+    update.$set.previousResponse = previousResponse
+
+  if (tool_images)
+    update.$set.tool_images = tool_images
+
+  if (tool_calls)
+    update.$set.tool_calls = tool_calls
+
+  if (editImageId)
+    update.$set.editImageId = editImageId
+
+  if (updateDateTime || (response && response.trim().length > 0))
+    update.$set.dateTime = new Date().getTime()
+
+  await chatCol.updateOne(query, update)
+}
+
+export async function updateChatSearchQuery(chatId: string, searchQuery: string) {
+  const query = { _id: new ObjectId(chatId) }
+  const update = {
+    $set: {
+      searchQuery,
+    },
+  }
+  const result = await chatCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateChatSearchResult(chatId: string, searchResults: SearchResult[], searchUsageTime: number) {
+  const query = { _id: new ObjectId(chatId) }
+  const update = {
+    $set: {
+      searchResults,
+      searchUsageTime,
+    },
+  }
+  const result = await chatCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function insertChatUsage(userId: ObjectId, roomId: number, chatId: ObjectId, messageId: string, model: string, usage: UsageResponse, imageUsage?: ImageUsageItem[]) {
+  const chatUsage = new ChatUsage(userId, roomId, chatId, messageId, model, usage, imageUsage)
+  await usageCol.insertOne(chatUsage)
+  return chatUsage
+}
+
+export async function createChatRoom(
+  userId: string,
+  title: string,
+  roomId: number,
+  chatModel: string,
+  maxContextCount: number,
+  thinkEnabled = false,
+  searchEnabled = true,
+) {
+  const config = await getCacheConfig()
+  if (!chatModel) {
+    chatModel = config?.siteConfig?.chatModels.split(',')[0]
+  }
+  if (maxContextCount === undefined) {
+    maxContextCount = 10
+  }
+  const room = new ChatRoom(userId, title, roomId, chatModel, true, maxContextCount, searchEnabled, thinkEnabled, false)
+  // After room creation, set imageUploadEnabled based on chatModel.
+  // Initialize as false here; the room-create API will set it dynamically.
+  room.imageUploadEnabled = false
+  await roomCol.insertOne(room)
+  return room
+}
+
+export async function renameChatRoom(userId: string, title: string, roomId: number) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      title,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function deleteChatRoom(userId: string, roomId: number) {
+  const result = await roomCol.updateOne({ roomId, userId }, { $set: { status: Status.Deleted } })
+  await clearChat(roomId)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomPrompt(userId: string, roomId: number, prompt: string) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      prompt,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomUsingContext(userId: string, roomId: number, using: boolean) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      usingContext: using,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomChatModel(userId: string, roomId: number, chatModel: string) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      chatModel,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomSearchEnabled(userId: string, roomId: number, searchEnabled: boolean) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      searchEnabled,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomThinkEnabled(userId: string, roomId: number, thinkEnabled: boolean) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      thinkEnabled,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomToolsEnabled(userId: string, roomId: number, toolsEnabled: boolean) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      toolsEnabled,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomImageUploadEnabled(userId: string, roomId: number, imageUploadEnabled: boolean) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      imageUploadEnabled,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomMaxContextCount(userId: string, roomId: number, maxContextCount: number) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      maxContextCount,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function getChatRooms(userId: string) {
+  const cursor = roomCol.find({ userId, status: { $ne: Status.Deleted } })
+  const rooms = []
+  for await (const doc of cursor)
+    rooms.push(doc)
+  return rooms
+}
+
+export async function getChatRoomsCount(userId: string, page: number, size: number) {
+  let total = 0
+  const skip = (page - 1) * size
+  const limit = size
+  const agg = []
+  if (userId !== null && userId !== 'undefined' && userId !== undefined && userId.trim().length !== 0) {
+    agg.push({
+      $match: {
+        userId,
+      },
+    })
+    total = await roomCol.countDocuments({ userId })
+  }
+  else {
+    total = await roomCol.countDocuments()
+  }
+  const agg2 = [
+    {
+      $lookup: {
+        from: 'chat',
+        let: { roomId: '$roomId' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$roomId', '$$roomId'] },
+                  { $ne: ['$status', Status.InversionDeleted] },
+                ],
+              },
+            },
+          },
+          {
+            $sort: { dateTime: -1 },
+          },
+          {
+            $group: {
+              _id: null,
+              chatCount: { $sum: 1 },
+              lastChat: { $first: '$$ROOT' },
+            },
+          },
+        ],
+        as: 'chatInfo',
+      },
+    },
+    {
+      $addFields: {
+        chatCount: {
+          $ifNull: [{ $arrayElemAt: ['$chatInfo.chatCount', 0] }, 0],
+        },
+        lastChat: {
+          $arrayElemAt: ['$chatInfo.lastChat', 0],
+        },
+        user_ObjectId: {
+          $toObjectId: '$userId',
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: 'user',
+        localField: 'user_ObjectId',
+        foreignField: '_id',
+        as: 'user',
+        pipeline: [
+          {
+            $project: {
+              name: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: {
+        path: '$user',
+        preserveNullAndEmptyArrays: false,
+      },
+    },
+    {
+      $project: {
+        userId: 1,
+        title: { $ifNull: ['$lastChat.prompt', ''] },
+        username: '$user.name',
+        roomId: 1,
+        chatCount: 1,
+        dateTime: { $ifNull: ['$lastChat.dateTime', null] },
+      },
+    },
+    {
+      $sort: {
+        dateTime: -1,
+      },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $limit: limit,
+    },
+  ]
+  Array.prototype.push.apply(agg, agg2)
+
+  const cursor = roomCol.aggregate(agg)
+  const data = await cursor.toArray()
+  return { total, data }
+}
+
+export async function getChatRoom(userId: string, roomId: number) {
+  return await roomCol.findOne({ userId, roomId, status: { $ne: Status.Deleted } }) as ChatRoom
+}
+
+export async function existsChatRoom(userId: string, roomId: number) {
+  const room = await roomCol.findOne({ roomId, userId })
+  return !!room
+}
+
+export async function deleteAllChatRooms(userId: string) {
+  await roomCol.updateMany({ userId, status: Status.Normal }, { $set: { status: Status.Deleted } })
+  await chatCol.updateMany({ userId, status: Status.Normal }, { $set: { status: Status.Deleted } })
+}
+
+export async function getChats(roomId: number, lastId?: number, all?: string): Promise<ChatInfo[]> {
+  if (!lastId)
+    lastId = new Date().getTime()
+  let query = {}
+  if (all === null || all === 'undefined' || all === undefined || all.trim().length === 0)
+    query = { roomId, uuid: { $lt: lastId }, status: { $ne: Status.Deleted } }
+  else
+    query = { roomId, uuid: { $lt: lastId } }
+
+  const limit = 20
+  const cursor = chatCol.find(query).sort({ dateTime: -1 }).limit(limit)
+  const chats = []
+  for await (const doc of cursor)
+    chats.push(doc)
+  chats.reverse()
+  return chats
+}
+
+export async function clearChat(roomId: number) {
+  const query = { roomId }
+  const update = {
+    $set: {
+      status: Status.Deleted,
+    },
+  }
+  await chatCol.updateMany(query, update)
+}
+
+export async function deleteChat(roomId: number, uuid: number, inversion: boolean) {
+  const query = { roomId, uuid }
+  let update = {
+    $set: {
+      status: Status.Deleted,
+    },
+  }
+  const chat = await chatCol.findOne(query)
+  if (chat.status === Status.InversionDeleted && !inversion) { /* empty */ }
+  else if (chat.status === Status.ResponseDeleted && inversion) { /* empty */ }
+  else if (inversion) {
+    update = {
+      $set: {
+        status: Status.InversionDeleted,
+      },
+    }
+  }
+  else {
+    update = {
+      $set: {
+        status: Status.ResponseDeleted,
+      },
+    }
+  }
+  await chatCol.updateOne(query, update)
+}
+
+// Add useAmount and limit_switch in createUser/updateUserInfo.
+export async function createUser(email: string, password: string, roles?: UserRole[], status?: Status, remark?: string, useAmount?: number, limit_switch?: boolean): Promise<UserInfo> {
+  email = email.toLowerCase()
+  const userInfo = new UserInfo(email, password)
+  const config = await getCacheConfig()
+
+  if (roles && roles.includes(UserRole.Admin))
+    userInfo.status = Status.Normal
+  // Using `if (status !== null)` check because status.Normal value is 0, so `if (status)` would fail when status is Normal
+  if (status !== null)
+    userInfo.status = status
+
+  userInfo.roles = roles
+  userInfo.remark = remark
+
+  // Initialize user configuration with default settings
+  if (limit_switch != null)
+    userInfo.limit_switch = limit_switch
+  if (useAmount != null)
+    userInfo.useAmount = useAmount
+  else
+    userInfo.useAmount = config?.siteConfig?.globalAmount ?? 10
+
+  // Use the first item from the globally available chatModel configuration as the default model for new users
+  userInfo.config = new UserConfig()
+  const defaultModelName = config?.siteConfig?.chatModels.split(',')[0]
+
+  // Choose a default model based on user role and available keys.
+  if (defaultModelName && userInfo.roles && userInfo.roles.length > 0) {
+    try {
+      const keys = (await getCacheApiKeys()).filter(d => hasAnyRole(d.userRoles, userInfo.roles))
+      // Find the first key matching the default model.
+      const matchingKey = keys.find(key => key.chatModel === defaultModelName)
+
+      if (matchingKey && (matchingKey.toolsEnabled || matchingKey.imageUploadEnabled)) {
+        // Use "modelName|keyId" format when the key has special features.
+        userInfo.config.chatModel = `${defaultModelName}|${matchingKey._id.toString()}`
+      }
+      else {
+        // Otherwise use the plain model name.
+        userInfo.config.chatModel = defaultModelName
+      }
+    }
+    catch {
+      // If keys retrieval fails, use the default model name.
+      userInfo.config.chatModel = defaultModelName
+    }
+  }
+  else {
+    userInfo.config.chatModel = defaultModelName || ''
+  }
+  userInfo.config.maxContextCount = 10
+
+  await userCol.insertOne(userInfo)
+  return userInfo
+}
+
+export async function updateUserInfo(userId: string, user: UserInfo) {
+  await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { name: user.name, description: user.description, avatar: user.avatar, useAmount: user.useAmount } })
+}
+
+// Update user chat usage after redemption (totals are calculated in the frontend).
+export async function updateUserAmount(userId: string, amt: number) {
+  return userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { useAmount: amt } })
+}
+
+export async function updateUserChatModel(userId: string, chatModel: string) {
+  await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { 'config.chatModel': chatModel } })
+}
+
+export async function updateUserMaxContextCount(userId: string, maxContextCount: number) {
+  await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { 'config.maxContextCount': maxContextCount } })
+}
+
+export async function updateUser2FA(userId: string, secretKey: string) {
+  await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { secretKey, updateTime: new Date().toLocaleString() } })
+}
+
+export async function disableUser2FA(userId: string) {
+  await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { secretKey: null, updateTime: new Date().toLocaleString() } })
+}
+
+export async function updateUserPassword(userId: string, password: string) {
+  await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { password, updateTime: new Date().toLocaleString() } })
+}
+
+export async function updateUserPasswordWithVerifyOld(userId: string, oldPassword: string, newPassword: string) {
+  return userCol.updateOne({ _id: new ObjectId(userId), password: oldPassword }, { $set: { password: newPassword, updateTime: new Date().toLocaleString() } })
+}
+
+export async function getUser(email: string): Promise<UserInfo> {
+  email = email.toLowerCase()
+  const userInfo = await userCol.findOne({ email })
+  await initUserInfo(userInfo)
+  return userInfo
+}
+
+export async function getUsers(page: number, size: number, search?: string): Promise<{ users: UserInfo[], total: number }> {
+  const query: Filter<UserInfo> = { status: { $ne: Status.Deleted } }
+  if (search && search.trim()) {
+    query.email = { $regex: search.trim(), $options: 'i' }
+  }
+  const cursor = userCol.find(query).sort({ createTime: -1 })
+  const total = await userCol.countDocuments(query)
+  const skip = (page - 1) * size
+  const limit = size
+  const pagedCursor = cursor.skip(skip).limit(limit)
+  const users: UserInfo[] = []
+  for await (const doc of pagedCursor)
+    users.push(doc)
+  users.forEach((user) => {
+    initUserInfo(user)
+  })
+  return { users, total }
+}
+
+export async function getUserById(userId: string): Promise<UserInfo> {
+  const userInfo = await userCol.findOne({ _id: new ObjectId(userId) })
+  await initUserInfo(userInfo)
+  return userInfo
+}
+
+export async function hasAdminUser(): Promise<boolean> {
+  const total = await userCol.countDocuments({
+    status: Status.Normal,
+    roles: UserRole.Admin,
+  })
+
+  return total > 0
+}
+
+async function initUserInfo(userInfo: WithId<UserInfo>) {
+  if (userInfo == null)
+    return
+  if (userInfo.config == null)
+    userInfo.config = new UserConfig()
+  if (userInfo.config.chatModel == null)
+    userInfo.config.chatModel = ''
+  if (userInfo.roles == null || userInfo.roles.length <= 0) {
+    userInfo.roles = []
+    if (process.env.ROOT_USER === userInfo.email.toLowerCase())
+      userInfo.roles.push(UserRole.Admin)
+    userInfo.roles.push(UserRole.User)
+  }
+}
+
+export async function verifyUser(email: string, status: Status) {
+  email = email.toLowerCase()
+  await userCol.updateOne({ email }, { $set: { status, verifyTime: new Date().toLocaleString() } })
+}
+
+export async function updateUserStatus(userId: string, status: Status) {
+  await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { status, verifyTime: new Date().toLocaleString() } })
+}
+
+// Added useAmount and limit_switch.
+export async function updateUser(userId: string, roles: UserRole[], password: string, remark?: string, useAmount?: number, limit_switch?: boolean) {
+  const user = await getUserById(userId)
+  const query = { _id: new ObjectId(userId) }
+  if (user.password !== password && user.password) {
+    const newPassword = md5(password)
+    await userCol.updateOne(query, { $set: { roles, verifyTime: new Date().toLocaleString(), password: newPassword, remark, useAmount, limit_switch } })
+  }
+  else {
+    await userCol.updateOne(query, { $set: { roles, verifyTime: new Date().toLocaleString(), remark, useAmount, limit_switch } })
+  }
+}
+
+export async function getConfig(): Promise<Config> {
+  return await configCol.findOne() as Config
+}
+
+export async function updateConfig(config: Config): Promise<Config> {
+  const result = await configCol.replaceOne({ _id: config._id }, config, { upsert: true })
+  if (result.modifiedCount > 0 || result.upsertedCount > 0)
+    return config
+  if (result.matchedCount > 0 && result.modifiedCount <= 0 && result.upsertedCount <= 0)
+    return config
+  return null
+}
+
+export async function getUserStatisticsByDay(userId: ObjectId, start: number, end: number): Promise<any> {
+  const pipeline = [
+    { // filter by dateTime
+      $match: {
+        dateTime: {
+          $gte: start,
+          $lte: end,
+        },
+        userId,
+      },
+    },
+    { // convert dateTime to date
+      $addFields: {
+        date: {
+          $dateToString: {
+            format: '%Y-%m-%d',
+            date: {
+              $toDate: '$dateTime',
+            },
+          },
+        },
+      },
+    },
+    { // group by date
+      $group: {
+        _id: '$date',
+        promptTokens: {
+          $sum: '$promptTokens',
+        },
+        completionTokens: {
+          $sum: '$completionTokens',
+        },
+        totalTokens: {
+          $sum: '$totalTokens',
+        },
+      },
+    },
+    { // sort by date
+      $sort: {
+        _id: 1,
+      },
+    },
+  ]
+
+  const aggStatics = await usageCol.aggregate(pipeline).toArray()
+
+  const step = 86400000 // 1 day in milliseconds
+  const result = {
+    promptTokens: null,
+    completionTokens: null,
+    totalTokens: null,
+    chartData: [],
+  }
+  for (let i = start; i <= end; i += step) {
+    // Convert the timestamp to a Date object
+    const date = dayjs(i, 'x').format('YYYY-MM-DD')
+
+    const dateData = aggStatics.find(x => x._id === date) || { _id: date, promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+
+    result.promptTokens += dateData.promptTokens
+    result.completionTokens += dateData.completionTokens
+    result.totalTokens += dateData.totalTokens
+    result.chartData.push(dateData)
+  }
+
+  return result
+}
+
+export async function getUserStatisticsByModel(start?: number, end?: number): Promise<any> {
+  const enabledKeys = await keyCol.find({ status: Status.Normal }).toArray()
+  const matchCondition: any = {}
+  if (start !== undefined && end !== undefined) {
+    matchCondition.dateTime = {
+      $gte: start,
+      $lte: end,
+    }
+  }
+
+  const pipeline = [
+    {
+      $match: matchCondition,
+    },
+    {
+      $lookup: {
+        from: 'chat',
+        localField: 'chatId',
+        foreignField: '_id',
+        as: 'chatInfo',
+      },
+    },
+    {
+      $unwind: {
+        path: '$chatInfo',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $addFields: {
+        imageCount: {
+          $cond: {
+            if: { $isArray: '$chatInfo.tool_images' },
+            then: { $size: '$chatInfo.tool_images' },
+            else: 0,
+          },
+        },
+        // Calculate total image tokens.
+        imageOutputTokens: {
+          $cond: {
+            if: { $isArray: '$imageUsage' },
+            then: {
+              $sum: {
+                $map: {
+                  input: '$imageUsage',
+                  as: 'img',
+                  in: { $ifNull: ['$$img.tokens', 0] },
+                },
+              },
+            },
+            else: 0,
+          },
+        },
+        // Add date fields.
+        date: {
+          $dateToString: {
+            format: '%Y-%m-%d',
+            date: {
+              $toDate: '$dateTime',
+            },
+          },
+        },
+      },
+    },
+    {
+      // Group by userId, model, and date.
+      $group: {
+        _id: {
+          userId: '$userId',
+          model: '$model',
+          date: '$date',
+        },
+        promptTokens: {
+          $sum: '$promptTokens',
+        },
+        completionTokens: {
+          $sum: '$completionTokens',
+        },
+        totalTokens: {
+          $sum: '$totalTokens',
+        },
+        imageCount: {
+          $sum: '$imageCount',
+        },
+        imageOutputTokens: {
+          $sum: '$imageOutputTokens',
+        },
+        usageCount: {
+          $sum: 1,
+        },
+      },
+    },
+    {
+      // Join the user collection to get user details.
+      $lookup: {
+        from: 'user',
+        localField: '_id.userId',
+        foreignField: '_id',
+        as: 'userInfo',
+      },
+    },
+    {
+      // Unwind userInfo array.
+      $unwind: {
+        path: '$userInfo',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      // Shape output fields.
+      $project: {
+        _id: 0,
+        userId: { $toString: '$_id.userId' },
+        modelKey: '$_id.model',
+        date: '$_id.date',
+        promptTokens: 1,
+        completionTokens: 1,
+        totalTokens: 1,
+        imageCount: 1,
+        imageOutputTokens: 1,
+        usageCount: 1,
+        userEmail: '$userInfo.email',
+        userName: '$userInfo.name',
+      },
+    },
+    {
+      // Sort by date.
+      $sort: {
+        date: 1,
+      },
+    },
+  ]
+
+  const aggResults = await usageCol.aggregate(pipeline).toArray()
+
+  // Use nested maps: userId -> modelKey -> date -> data.
+  const resultMap = new Map<string, Map<string, Map<string, any>>>()
+
+  for (const item of aggResults) {
+    const userId = item.userId
+    const modelKey = item.modelKey
+    const date = item.date
+
+    let matchedKey: KeyConfig | undefined
+    if (modelKey.includes('|')) {
+      // Format: modelName|keyId.
+      const [modelName, keyId] = modelKey.split('|')
+      matchedKey = enabledKeys.find(key => key._id.toString() === keyId && key.chatModel === modelName)
+    }
+    else {
+      // Format: modelName.
+      matchedKey = enabledKeys.find(key => key.chatModel === modelKey)
+    }
+
+    // Skip when no matching key is found or the key is disabled.
+    if (!matchedKey || matchedKey.status !== Status.Normal) {
+      continue
+    }
+
+    // Initialize the nested structure.
+    if (!resultMap.has(userId)) {
+      resultMap.set(userId, new Map())
+    }
+    const userModelMap = resultMap.get(userId)!
+
+    if (!userModelMap.has(modelKey)) {
+      userModelMap.set(modelKey, new Map())
+    }
+    const modelDateMap = userModelMap.get(modelKey)!
+
+    // Store data by date.
+    if (!modelDateMap.has(date)) {
+      modelDateMap.set(date, {
+        date,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        imageCount: 0,
+        imageOutputTokens: 0,
+        usageCount: 0,
+      })
+    }
+
+    const dateData = modelDateMap.get(date)!
+    dateData.promptTokens += item.promptTokens
+    dateData.completionTokens += item.completionTokens
+    dateData.totalTokens += item.totalTokens
+    dateData.imageCount += item.imageCount
+    dateData.imageOutputTokens += item.imageOutputTokens
+    dateData.usageCount += item.usageCount
+  }
+
+  // Convert to final format: user -> model -> date.
+  const result: any[] = []
+  resultMap.forEach((userModelMap, userId) => {
+    // Use the first item to get user info (shared across dates).
+    const firstItem = aggResults.find(item => item.userId === userId)
+    const userData: any = {
+      userId,
+      userEmail: firstItem?.userEmail || '',
+      userName: firstItem?.userName || '',
+      models: [],
+    }
+
+    userModelMap.forEach((modelDateMap, modelKey) => {
+      let matchedKey: KeyConfig | undefined
+      if (modelKey.includes('|')) {
+        const [modelName, keyId] = modelKey.split('|')
+        matchedKey = enabledKeys.find(key => key._id.toString() === keyId && key.chatModel === modelName)
+      }
+      else {
+        matchedKey = enabledKeys.find(key => key.chatModel === modelKey)
+      }
+
+      if (!matchedKey || matchedKey.status !== Status.Normal) {
+        return
+      }
+
+      const displayModelName = matchedKey.modelAlias || matchedKey.chatModel
+
+      // Convert date map to an array and sort by date.
+      const dates = Array.from(modelDateMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+
+      // Calculate totals.
+      const totalPromptTokens = dates.reduce((sum, d) => sum + d.promptTokens, 0)
+      const totalCompletionTokens = dates.reduce((sum, d) => sum + d.completionTokens, 0)
+      const totalTotalTokens = dates.reduce((sum, d) => sum + d.totalTokens, 0)
+      const totalImageCount = dates.reduce((sum, d) => sum + d.imageCount, 0)
+      const totalImageTokens = dates.reduce((sum, d) => sum + d.imageTokens, 0)
+      const totalUsageCount = dates.reduce((sum, d) => sum + d.usageCount, 0)
+
+      userData.models.push({
+        modelKey,
+        modelName: displayModelName,
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
+        totalTokens: totalTotalTokens,
+        imageCount: totalImageCount,
+        imageTokens: totalImageTokens,
+        usageCount: totalUsageCount,
+        dates, // 添加按日期分组的数据
+      })
+    })
+
+    result.push(userData)
+  })
+
+  // Sort by userId.
+  result.sort((a, b) => a.userId.localeCompare(b.userId))
+
+  return result
+}
+
+export async function getKeys(): Promise<{ keys: KeyConfig[] }> {
+  const query = { status: { $ne: Status.Disabled } }
+  const cursor = keyCol.find(query)
+  const keys = []
+  for await (const doc of cursor)
+    keys.push(doc)
+  return { keys }
+}
+
+export async function upsertKey(key: KeyConfig): Promise<KeyConfig> {
+  if (key._id === undefined)
+    await keyCol.insertOne(key)
+  else
+    await keyCol.replaceOne({ _id: key._id }, key, { upsert: true })
+  return key
+}
+
+export async function updateApiKeyStatus(id: string, status: Status) {
+  await keyCol.updateOne({ _id: new ObjectId(id) }, { $set: { status } })
+}
+
+export async function getBuiltInPromptList(): Promise<{ data: BuiltInPrompt[], total: number }> {
+  const total = await builtInPromptCol.countDocuments()
+  const cursor = builtInPromptCol.find().sort({ order: 1, _id: -1 })
+  const data = await cursor.toArray()
+  return { data, total }
+}
+
+export async function upsertBuiltInPrompt(builtInPrompt: BuiltInPrompt): Promise<BuiltInPrompt> {
+  if (builtInPrompt._id === undefined) {
+    const doc = await builtInPromptCol.insertOne(builtInPrompt)
+    builtInPrompt._id = doc.insertedId
+  }
+  else {
+    await builtInPromptCol.replaceOne({ _id: builtInPrompt._id }, builtInPrompt, { upsert: true })
+  }
+  return builtInPrompt
+}
+
+export async function deleteBuiltInPrompt(id: string) {
+  const query = { _id: new ObjectId(id) }
+  await builtInPromptCol.deleteOne(query)
+}
+
+export async function upsertUserPrompt(userPrompt: UserPrompt): Promise<UserPrompt> {
+  if (userPrompt._id === undefined) {
+    const doc = await userPromptCol.insertOne(userPrompt)
+    userPrompt._id = doc.insertedId
+  }
+  else {
+    await userPromptCol.replaceOne({ _id: userPrompt._id }, userPrompt, { upsert: true })
+  }
+  return userPrompt
+}
+export async function getUserPromptList(userId: string): Promise<{ data: UserPrompt[], total: number }> {
+  const query = { userId }
+  const total = await userPromptCol.countDocuments(query)
+  const cursor = userPromptCol.find(query).sort({ order: 1, _id: -1 })
+  const data = await cursor.toArray()
+  return { data, total }
+}
+
+export async function deleteUserPrompt(id: string) {
+  const query = { _id: new ObjectId(id) }
+  await userPromptCol.deleteOne(query)
+}
+
+export async function clearUserPrompt(userId: string) {
+  const query = { userId }
+  await userPromptCol.deleteMany(query)
+}
+
+export async function importUserPrompt(userPromptList: UserPrompt[]) {
+  await userPromptCol.insertMany(userPromptList)
+}

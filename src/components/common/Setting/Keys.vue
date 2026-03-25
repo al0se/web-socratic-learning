@@ -1,0 +1,394 @@
+<script lang="ts" setup>
+import type { DataTableColumns } from 'naive-ui'
+import { NButton, NTag } from 'naive-ui'
+import { fetchGetKeys, fetchUpdateApiKeyStatus, fetchUpsertApiKey } from '@/api'
+import { useBasicLayout } from '@/hooks/useBasicLayout'
+import { useAuthStore } from '@/store'
+import { apiModelOptions, KeyConfig, Status, UserRole, userRoleOptions } from './model'
+
+const { t } = useI18n()
+
+const ms = useMessage()
+const dialog = useDialog()
+const authStore = useAuthStore()
+const { isMobile } = useBasicLayout()
+
+const loading = ref(false)
+const show = ref(false)
+const handleSaving = ref(false)
+const keyConfig = ref(new KeyConfig('', 'ChatGPTAPI', '', [], ''))
+
+const keys = ref([])
+function createColumns(): DataTableColumns {
+  return [
+    {
+      title: () => t('setting.model.table.apiModel'),
+      key: 'keyModel',
+      width: 90,
+    },
+    {
+      title: () => t('setting.model.table.baseUrl'),
+      key: 'baseUrl',
+      width: 150,
+    },
+    {
+      title: () => t('setting.model.table.chatModel'),
+      key: 'chatModel',
+      width: 140,
+      render(row: any) {
+        return row.chatModel || '-'
+      },
+    },
+    {
+      title: () => t('setting.model.table.alias'),
+      key: 'modelAlias',
+      width: 110,
+      render(row: any) {
+        return row.modelAlias || '-'
+      },
+    },
+    {
+      title: () => t('setting.model.table.key'),
+      key: 'key',
+      resizable: true,
+      width: 90,
+      minWidth: 50,
+      maxWidth: 90,
+      ellipsis: true,
+    },
+    {
+      title: () => t('setting.model.table.userRoles'),
+      key: 'userRoles',
+      width: 140,
+      render(row: any) {
+        const tags = row.userRoles.map((userRole: UserRole) => {
+          return h(
+            NTag,
+            {
+              style: {
+                marginRight: '6px',
+              },
+              type: 'info',
+              bordered: false,
+              size: 'small',
+            },
+            {
+              default: () => UserRole[userRole],
+            },
+          )
+        })
+        return tags
+      },
+    },
+    {
+      title: () => t('setting.model.table.remark'),
+      key: 'remark',
+      width: 120,
+    },
+    {
+      title: () => t('setting.model.table.action'),
+      key: '_id',
+      width: 140,
+      fixed: 'right',
+      render(row: any) {
+        const actions: any[] = []
+        if (row.status === Status.Normal) {
+          actions.push(h(
+            NButton,
+            {
+              tertiary: true,
+              size: 'small',
+              style: {
+                marginRight: '6px',
+              },
+              type: 'info',
+              onClick: () => handleEditKey(row as KeyConfig),
+            },
+            { default: () => [h(IconRiEdit2Line, { class: 'mr-1 text-base' }), t('common.edit')] },
+          ))
+        }
+        actions.push(h(
+          NButton,
+          {
+            tertiary: true,
+            size: 'small',
+            type: 'error',
+            onClick: () => handleUpdateApiKeyStatus(row._id as string, Status.Disabled),
+          },
+          { default: () => [h(IconRiDeleteBinLine, { class: 'mr-1 text-base' }), t('common.delete')] },
+        ))
+        return actions
+      },
+    },
+  ]
+}
+
+const columns = createColumns()
+
+async function handleGetKeys() {
+  if (loading.value)
+    return
+  keys.value.length = 0
+  loading.value = true
+  const data = (await fetchGetKeys()).data
+  data.keys.forEach((key: never) => {
+    keys.value.push(key)
+  })
+  keyConfig.value = keys.value[0]
+  loading.value = false
+}
+
+async function handleUpdateApiKeyStatus(id: string, status: Status) {
+  dialog.warning({
+    title: t('chat.deleteKey'),
+    content: t('chat.deleteKeyConfirm'),
+    positiveText: t('common.yes'),
+    negativeText: t('common.no'),
+    onPositiveClick: async () => {
+      await fetchUpdateApiKeyStatus(id, status)
+      await authStore.getSession()
+      ms.info(t('common.success'))
+      await handleGetKeys()
+    },
+  })
+}
+
+async function handleUpdateKeyConfig() {
+  if (!keyConfig.value.key) {
+    ms.error(t('setting.model.apiKeyRequired'))
+    return
+  }
+  handleSaving.value = true
+  try {
+    await fetchUpsertApiKey(keyConfig.value)
+    await authStore.getSession()
+    await handleGetKeys()
+    show.value = false
+  }
+  catch (error: any) {
+    ms.error(error.message)
+  }
+  handleSaving.value = false
+}
+
+function handleNewKey() {
+  keyConfig.value = new KeyConfig('', 'ChatGPTAPI', '', [], '')
+  show.value = true
+}
+
+function handleEditKey(key: KeyConfig) {
+  keyConfig.value = key
+  show.value = true
+}
+
+onMounted(async () => {
+  await handleGetKeys()
+})
+</script>
+
+<template>
+  <div class="box-border h-full flex-1 min-h-0 overflow-hidden px-4 pb-4 pt-2" style="height: 100%;">
+    <div class="flex h-full min-h-0 flex-col gap-3">
+      <div class="shrink-0 flex items-center justify-end">
+        <NButton size="small" type="primary" @click="handleNewKey()">
+          <IconRiAddLine class="mr-1 text-base" />
+          {{ t('common.add') }}
+        </NButton>
+      </div>
+      <NDataTable
+        class="flex-1 min-h-0"
+        :loading="loading"
+        :row-key="(rowData) => rowData._id"
+        :columns="columns"
+        :data="keys"
+        flex-height
+        :scroll-x="1150"
+        striped
+      />
+    </div>
+  </div>
+
+  <NModal v-model:show="show" :auto-focus="false" preset="card" :style="{ width: !isMobile ? '50%' : '100%' }">
+    <div class="p-4 space-y-5 min-h-[200px]">
+      <div class="space-y-6">
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.apiModel') }}</span>
+          <div class="flex-1">
+            <NSelect
+              style="width: 100%"
+              :value="keyConfig.keyModel"
+              :options="apiModelOptions"
+              @update-value="value => keyConfig.keyModel = value"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.api') }}</span>
+          <div class="flex-1">
+            <NInput
+              v-model:value="keyConfig.key" type="textarea"
+              :autosize="{ minRows: 3, maxRows: 4 }" placeholder=""
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.apiBaseUrl') }}</span>
+          <div class="flex-1">
+            <NInput
+              v-model:value="keyConfig.baseUrl"
+              style="width: 100%" placeholder=""
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.chatModels') }}</span>
+          <div class="flex-1">
+            <NSelect
+              style="width: 100%"
+              :value="keyConfig.chatModel"
+              :options="authStore.session?.allChatModels"
+              @update-value="value => keyConfig.chatModel = value"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.modelAlias') }}</span>
+          <div class="flex-1">
+            <NInput
+              v-model:value="keyConfig.modelAlias"
+              style="width: 100%"
+              placeholder=""
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.userRoles') }}</span>
+          <div class="flex-1">
+            <NSelect
+              style="width: 100%"
+              multiple
+              :value="keyConfig.userRoles"
+              :options="userRoleOptions"
+              @update-value="value => keyConfig.userRoles = value"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.status') }}</span>
+          <div class="flex-1">
+            <NSwitch
+              :round="false"
+              :value="keyConfig.status === Status.Normal"
+              @update:value="(val) => { keyConfig.status = val ? Status.Normal : Status.Disabled }"
+            />
+          </div>
+        </div>
+        <div v-if="keyConfig.keyModel === 'ResponsesAPI'" class="grid grid-cols-2 gap-4">
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('chat.tools') }}</span>
+            <div class="flex-1">
+              <NSwitch
+                :round="false"
+                :value="keyConfig.toolsEnabled || false"
+                @update:value="(val) => { keyConfig.toolsEnabled = val }"
+              />
+            </div>
+          </div>
+        </div>
+        <div v-if="keyConfig.toolsEnabled" class="grid grid-cols-2 gap-4">
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.inputFidelity') }}</span>
+            <div class="flex-1">
+              <NSelect
+                style="width: 100%"
+                :value="keyConfig.inputFidelity || 'high'"
+                :options="[
+                  { label: t('setting.low'), value: 'low' },
+                  { label: t('setting.medium'), value: 'medium' },
+                  { label: t('setting.high'), value: 'high' },
+                ]"
+                @update-value="value => keyConfig.inputFidelity = value"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.quality') }}</span>
+            <div class="flex-1">
+              <NSelect
+                style="width: 100%"
+                :value="keyConfig.quality || 'high'"
+                :options="[
+                  { label: t('setting.low'), value: 'low' },
+                  { label: t('setting.medium'), value: 'medium' },
+                  { label: t('setting.high'), value: 'high' },
+                ]"
+                @update-value="value => keyConfig.quality = value"
+              />
+            </div>
+          </div>
+        </div>
+        <div v-if="keyConfig.toolsEnabled" class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.imageModel') }}</span>
+          <div class="flex-1">
+            <NSelect
+              style="width: 100%"
+              :value="keyConfig.imageModel || 'gpt-image-1.5'"
+              :options="[
+                { label: 'gpt-image-1', value: 'gpt-image-1' },
+                { label: 'gpt-image-1.5', value: 'gpt-image-1.5' },
+              ]"
+              @update-value="value => keyConfig.imageModel = value"
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.imageUpload') }}</span>
+            <div class="flex-1">
+              <NSwitch
+                :round="false"
+                :value="keyConfig.imageUploadEnabled || false"
+                @update:value="(val) => { keyConfig.imageUploadEnabled = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.model.defaultThinkEnabled') }}</span>
+            <div class="flex-1">
+              <NSwitch
+                :round="false"
+                :value="keyConfig.defaultThinkEnabled || false"
+                @update:value="(val) => { keyConfig.defaultThinkEnabled = val }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="shrink-0 w-[100px]">{{ t('setting.model.defaultSearchEnabled') }}</span>
+            <div class="flex-1">
+              <NSwitch
+                :round="false"
+                :value="keyConfig.defaultSearchEnabled || false"
+                @update:value="(val) => { keyConfig.defaultSearchEnabled = val }"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]">{{ t('setting.remark') }}</span>
+          <div class="flex-1">
+            <NInput
+              v-model:value="keyConfig.remark" type="textarea"
+              :autosize="{ minRows: 1, maxRows: 2 }" placeholder=""
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="shrink-0 w-[100px]" />
+          <NButton type="primary" :loading="handleSaving" @click="handleUpdateKeyConfig()">
+            {{ t('common.save') }}
+          </NButton>
+        </div>
+      </div>
+    </div>
+  </NModal>
+</template>

@@ -1,0 +1,12 @@
+{
+  "name": "local-mongo-runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node start-mongo.mjs"
+  },
+  "dependencies": {
+    "mongodb": "^7.0.0",
+    "mongodb-memory-server": "^10.1.4"
+  }
+}

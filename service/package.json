@@ -1,0 +1,66 @@
+{
+  "name": "chatgpt-web-service",
+  "type": "module",
+  "version": "1.0.0",
+  "private": false,
+  "packageManager": "pnpm@10.15.1+sha512.34e538c329b5553014ca8e8f4535997f96180a1d0f614339357449935350d924e22f8614682191264ec33d1462ac21561aff97f6bb18065351c162c7e8f6de67",
+  "description": "ChatGPT Web Service",
+  "author": "ChatGPT Web Contributors <dev@chatgpt-web.dev>",
+  "keywords": [
+    "chatgpt-web",
+    "chatgpt",
+    "chatbot",
+    "express",
+    "mongodb"
+  ],
+  "engines": {
+    "node": "^20 || ^22 || ^24"
+  },
+  "scripts": {
+    "start": "tsx ./src/index.ts",
+    "dev": "tsx watch --inspect ./src/index.ts",
+    "prod": "node --import tsx/esm ./build/index.js",
+    "type-check": "tsc --noEmit",
+    "build": "pnpm clean && tsc && pnpm copy",
+    "copy": "copyfiles -u 1 src/utils/templates/* build",
+    "clean": "rimraf build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "common:cleanup": "rimraf node_modules && rimraf pnpm-lock.yaml"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "@tavily/core": "^0.5.13",
+    "axios": "1.12.0",
+    "dayjs": "^1.11.19",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "file-type": "^21.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^7.0.0",
+    "multer": "^2.0.2",
+    "nodemailer": "7.0.7",
+    "openai": "^6.25.0",
+    "request-ip": "^3.3.0",
+    "speakeasy": "^2.0.0",
+    "tsx": "^4.21.0",
+    "undici": "^7.16.0"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^6.3.0",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "@types/nodemailer": "^7.0.4",
+    "@types/request-ip": "^0.0.41",
+    "@types/speakeasy": "^2.0.10",
+    "copyfiles": "^2.4.1",
+    "eslint": "^9.39.1",
+    "jiti": "^2.6.1",
+    "rimraf": "^6.1.2",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,363 @@
+import Router from 'express'
+import { auth } from '../middleware/auth'
+import { getCacheApiKeys } from '../storage/config'
+import {
+  createChatRoom,
+  deleteChatRoom,
+  existsChatRoom,
+  getChatRooms,
+  getChatRoomsCount,
+  getUserById,
+  renameChatRoom,
+  updateRoomChatModel,
+  updateRoomImageUploadEnabled,
+  updateRoomMaxContextCount,
+  updateRoomPrompt,
+  updateRoomSearchEnabled,
+  updateRoomThinkEnabled,
+  updateRoomToolsEnabled,
+  updateRoomUsingContext,
+} from '../storage/mongo'
+import { hasAnyRole } from '../utils/is'
+
+export const router = Router()
+
+router.get('/chatrooms', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const rooms = await getChatRooms(userId)
+    const result = []
+    rooms.forEach((r) => {
+      result.push({
+        roomId: r.roomId,
+        title: r.title,
+        isEdit: false,
+        prompt: r.prompt,
+        usingContext: r.usingContext === undefined ? true : r.usingContext,
+        maxContextCount: r.maxContextCount === undefined ? 10 : r.maxContextCount,
+        chatModel: r.chatModel,
+        searchEnabled: !!r.searchEnabled,
+        thinkEnabled: !!r.thinkEnabled,
+        toolsEnabled: !!r.toolsEnabled,
+        imageUploadEnabled: !!r.imageUploadEnabled,
+      })
+    })
+    res.send({ status: 'Success', message: null, data: result })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Load error', data: [] })
+  }
+})
+
+function formatTimestamp(timestamp: number) {
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+router.get('/chatrooms-count', auth, async (req, res) => {
+  try {
+    const userId = req.query.userId as string
+    const page = +req.query.page
+    const size = +req.query.size
+    const rooms = await getChatRoomsCount(userId, page, size)
+    const result = []
+    rooms.data.forEach((r) => {
+      result.push({
+        roomId: r.roomId,
+        title: r.title,
+        userId: r.userId,
+        name: r.username,
+        lastTime: formatTimestamp(r.dateTime),
+        chatCount: r.chatCount,
+      })
+    })
+    res.send({ status: 'Success', message: null, data: { data: result, total: rooms.total } })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Load error', data: [] })
+  }
+})
+
+router.post('/room-create', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const user = await getUserById(userId)
+    const { title, roomId, chatModel, modelId } = req.body as {
+      title: string
+      roomId: number
+      chatModel?: string
+      modelId?: string
+    }
+    const keys = (await getCacheApiKeys()).filter(d => hasAnyRole(d.userRoles, user.roles))
+    let selectedKey = modelId ? keys.find(key => key._id.toString() === modelId) : undefined
+    let resolvedChatModel = chatModel || user.config?.chatModel
+    if (selectedKey) {
+      resolvedChatModel = `${selectedKey.chatModel}|${selectedKey._id.toString()}`
+    }
+    let actualModelName = resolvedChatModel || ''
+    let specifiedKeyId: string | undefined
+    if (!selectedKey && resolvedChatModel && resolvedChatModel.includes('|')) {
+      const parts = resolvedChatModel.split('|')
+      actualModelName = parts[0]
+      specifiedKeyId = parts[1]
+      selectedKey = keys.find(key => key._id.toString() === specifiedKeyId && key.chatModel === actualModelName)
+    }
+    else if (selectedKey) {
+      actualModelName = selectedKey.chatModel
+      specifiedKeyId = selectedKey._id.toString()
+    }
+    const fallbackKey = !specifiedKeyId
+      ? keys.find(key => key.chatModel === actualModelName && !key.toolsEnabled && !key.imageUploadEnabled)
+      : undefined
+    const defaultThinkEnabled = selectedKey?.defaultThinkEnabled || fallbackKey?.defaultThinkEnabled || false
+    const defaultSearchEnabled = selectedKey?.defaultSearchEnabled || fallbackKey?.defaultSearchEnabled || false
+    const room = await createChatRoom(
+      userId,
+      title,
+      roomId,
+      resolvedChatModel || '',
+      user.config?.maxContextCount,
+      defaultThinkEnabled,
+      defaultSearchEnabled,
+    )
+    // Set imageUploadEnabled based on chatModel.
+    if (user && room.chatModel) {
+      // Parse model name, supporting "modelName|keyId".
+      actualModelName = room.chatModel
+      specifiedKeyId = undefined
+      if (room.chatModel.includes('|')) {
+        const parts = room.chatModel.split('|')
+        actualModelName = parts[0]
+        specifiedKeyId = parts[1]
+      }
+
+      let imageUploadEnabled = false
+      let toolsEnabled = false
+      const specifiedKey = specifiedKeyId
+        ? keys.find(key => key._id.toString() === specifiedKeyId && key.chatModel === actualModelName)
+        : selectedKey
+      if (specifiedKey) {
+        imageUploadEnabled = specifiedKey.imageUploadEnabled || false
+        toolsEnabled = specifiedKey.toolsEnabled || false
+      }
+
+      await updateRoomImageUploadEnabled(userId, roomId, imageUploadEnabled || false)
+      await updateRoomToolsEnabled(userId, roomId, toolsEnabled || false)
+      room.thinkEnabled = defaultThinkEnabled
+      room.searchEnabled = defaultSearchEnabled
+      room.imageUploadEnabled = imageUploadEnabled || false
+      room.toolsEnabled = toolsEnabled || false
+    }
+    res.send({ status: 'Success', message: null, data: room })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Create error', data: null })
+  }
+})
+
+router.post('/room-rename', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { title, roomId } = req.body as { title: string, roomId: number }
+    const success = await renameChatRoom(userId, title, roomId)
+    if (success)
+      res.send({ status: 'Success', message: null, data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Rename error', data: null })
+  }
+})
+
+router.post('/room-prompt', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { prompt, roomId } = req.body as { prompt: string, roomId: number }
+    const success = await updateRoomPrompt(userId, roomId, prompt)
+    if (success)
+      res.send({ status: 'Success', message: 'Saved successfully', data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Rename error', data: null })
+  }
+})
+
+router.post('/room-chatmodel', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { chatModel, roomId } = req.body as { chatModel: string, roomId: number }
+    const success = await updateRoomChatModel(userId, roomId, chatModel)
+
+    if (success) {
+      // Determine toolsEnabled based on the newly selected chatModel.
+      const user = await getUserById(userId)
+      if (user) {
+        // Parse model name, supporting "modelName|keyId".
+        let actualModelName = chatModel
+        let specifiedKeyId: string | undefined
+        if (chatModel.includes('|')) {
+          const parts = chatModel.split('|')
+          actualModelName = parts[0]
+          specifiedKeyId = parts[1]
+        }
+
+        const keys = (await getCacheApiKeys()).filter(d => hasAnyRole(d.userRoles, user.roles))
+
+        let toolsEnabled = false
+        let imageUploadEnabled = false
+
+        if (specifiedKeyId) {
+          // Use the specified keyId configuration.
+          const specifiedKey = keys.find(key => key._id.toString() === specifiedKeyId && key.chatModel === actualModelName)
+          if (specifiedKey) {
+            toolsEnabled = specifiedKey.toolsEnabled || false
+            imageUploadEnabled = specifiedKey.imageUploadEnabled || false
+          }
+        }
+        else {
+          toolsEnabled = false
+          imageUploadEnabled = false
+        }
+
+        // Update the room's toolsEnabled state.
+        await updateRoomToolsEnabled(userId, roomId, toolsEnabled || false)
+        // Update the room's imageUploadEnabled state.
+        await updateRoomImageUploadEnabled(userId, roomId, imageUploadEnabled || false)
+
+        res.send({
+          status: 'Success',
+          message: 'Saved successfully',
+          data: {
+            toolsEnabled: toolsEnabled || false,
+            imageUploadEnabled: imageUploadEnabled || false,
+          },
+        })
+      }
+      else {
+        res.send({ status: 'Success', message: 'Saved successfully', data: null })
+      }
+    }
+    else {
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+    }
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Rename error', data: null })
+  }
+})
+
+router.post('/room-max-context-count', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { maxContextCount, roomId } = req.body as { maxContextCount: number, roomId: number }
+    const success = await updateRoomMaxContextCount(userId, roomId, maxContextCount)
+    if (success)
+      res.send({ status: 'Success', message: 'Saved successfully', data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Update error', data: null })
+  }
+})
+
+router.post('/room-search-enabled', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { searchEnabled, roomId } = req.body as { searchEnabled: boolean, roomId: number }
+    const success = await updateRoomSearchEnabled(userId, roomId, searchEnabled)
+    if (success)
+      res.send({ status: 'Success', message: 'Saved successfully', data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Update error', data: null })
+  }
+})
+
+router.post('/room-think-enabled', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { thinkEnabled, roomId } = req.body as { thinkEnabled: boolean, roomId: number }
+    const success = await updateRoomThinkEnabled(userId, roomId, thinkEnabled)
+    if (success)
+      res.send({ status: 'Success', message: 'Saved successfully', data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Update error', data: null })
+  }
+})
+
+router.post('/room-tools-enabled', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { toolsEnabled, roomId } = req.body as { toolsEnabled: boolean, roomId: number }
+    const success = await updateRoomToolsEnabled(userId, roomId, toolsEnabled)
+    if (success)
+      res.send({ status: 'Success', message: 'Saved successfully', data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Update error', data: null })
+  }
+})
+
+router.post('/room-context', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { using, roomId } = req.body as { using: boolean, roomId: number }
+    const success = await updateRoomUsingContext(userId, roomId, using)
+    if (success)
+      res.send({ status: 'Success', message: 'Saved successfully', data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Rename error', data: null })
+  }
+})
+
+router.post('/room-delete', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { roomId } = req.body as { roomId: number }
+    if (!roomId || !await existsChatRoom(userId, roomId)) {
+      res.send({ status: 'Fail', message: 'Unknown room', data: null })
+      return
+    }
+    const success = await deleteChatRoom(userId, roomId)
+    if (success)
+      res.send({ status: 'Success', message: null, data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Delete error', data: null })
+  }
+})

@@ -1,0 +1,361 @@
+import type { ObjectId } from 'mongodb'
+import type { TextAuditServiceOptions, TextAuditServiceProvider } from 'src/utils/textAudit'
+
+export enum Status {
+  Normal = 0,
+  Deleted = 1,
+  InversionDeleted = 2,
+  ResponseDeleted = 3,
+  PreVerify = 4,
+  AdminVerify = 5,
+  Disabled = 6,
+}
+
+export enum UserRole {
+  Admin = 0,
+  User = 1,
+  Guest = 2,
+  Support = 3,
+  Viewer = 4,
+  Contributor = 5,
+  Developer = 6,
+  Tester = 7,
+  Partner = 8,
+}
+// Redeem code record.
+export class GiftCard {
+  _id: ObjectId
+  cardno: string
+  amount: number
+  redeemed: number // boolean
+  redeemed_by: string
+  redeemed_date: string
+  constructor(amount: number, redeemed: number) {
+    this.amount = amount
+    this.redeemed = redeemed
+  }
+}
+
+export class UserInfo {
+  _id: ObjectId
+  name: string
+  email: string
+  password: string
+  status: Status
+  createTime: string
+  verifyTime?: string
+  avatar?: string
+  description?: string
+  updateTime?: string
+  config?: UserConfig
+  roles?: UserRole[]
+  remark?: string
+  secretKey?: string // 2fa
+  useAmount?: number // chat usage amount
+  limit_switch?: boolean // chat amount limit switch
+  constructor(email: string, password: string) {
+    this.name = email
+    this.email = email
+    this.password = password
+    this.status = Status.PreVerify
+    this.createTime = new Date().toLocaleString()
+    this.verifyTime = null
+    this.updateTime = new Date().toLocaleString()
+    this.roles = [UserRole.User]
+    this.remark = null
+    this.useAmount = null
+    this.limit_switch = true
+  }
+}
+
+export class UserConfig {
+  chatModel: string
+  maxContextCount: number
+}
+
+export class ChatRoom {
+  _id: ObjectId
+  roomId: number
+  userId: string
+  title: string
+  prompt: string
+  usingContext: boolean
+  maxContextCount: number
+  status: Status = Status.Normal
+  chatModel: string
+  searchEnabled: boolean
+  thinkEnabled: boolean
+  toolsEnabled?: boolean
+  imageUploadEnabled?: boolean
+  constructor(userId: string, title: string, roomId: number, chatModel: string, usingContext: boolean, maxContextCount: number, searchEnabled: boolean, thinkEnabled: boolean, toolsEnabled?: boolean, imageUploadEnabled?: boolean) {
+    this.userId = userId
+    this.title = title
+    this.prompt = undefined
+    this.roomId = roomId
+    this.usingContext = usingContext
+    this.maxContextCount = maxContextCount
+    this.chatModel = chatModel
+    this.searchEnabled = searchEnabled
+    this.thinkEnabled = thinkEnabled
+    this.toolsEnabled = toolsEnabled
+    this.imageUploadEnabled = imageUploadEnabled
+  }
+}
+
+export class ChatOptions {
+  parentMessageId?: string
+  messageId?: string
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  estimated?: boolean
+  constructor(parentMessageId?: string, messageId?: string) {
+    this.parentMessageId = parentMessageId
+    this.messageId = messageId
+  }
+}
+
+export class previousResponse {
+  response: string
+  options: ChatOptions
+}
+
+export class SearchResult {
+  title: string
+  url: string
+  content: string
+}
+
+export class ChatInfo {
+  _id: ObjectId
+  roomId: number
+  model: string
+  uuid: number
+  dateTime: number
+  promptDateTime?: number // 用户消息的创建时间
+  prompt: string
+  images?: string[]
+  searchQuery?: string
+  searchResults?: SearchResult[]
+  searchUsageTime?: number
+  reasoning?: string
+  response?: string
+  status: Status = Status.Normal
+  options: ChatOptions
+  previousResponse?: previousResponse[]
+  tool_images?: string[] // AI-generated image file names
+  tool_calls?: Array<{ type: string, result?: any }> // Tool calls from AI
+  editImageId?: string // Edit image ID for image generation
+  constructor(roomId: number, uuid: number, prompt: string, images: string[], model: string, options: ChatOptions) {
+    this.roomId = roomId
+    this.model = model
+    this.uuid = uuid
+    this.prompt = prompt
+    this.images = images
+    this.options = options
+    const now = new Date().getTime()
+    this.dateTime = now
+    this.promptDateTime = now // 保存用户消息的创建时间
+  }
+}
+
+export class UsageResponse {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  estimated: boolean
+}
+
+export interface ImageUsageItem {
+  size?: string
+  quality?: string
+  model?: string
+  mainModel?: string
+  tokens?: number
+  data_type?: string
+}
+
+export class ChatUsage {
+  _id: ObjectId
+  userId: ObjectId
+  roomId: number
+  chatId: ObjectId
+  messageId: string
+  model: string
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  estimated: boolean
+  dateTime: number
+  imageUsage?: ImageUsageItem[]
+  constructor(userId: ObjectId, roomId: number, chatId: ObjectId, messageId: string, model: string, usage?: UsageResponse, imageUsage?: ImageUsageItem[]) {
+    this.userId = userId
+    this.roomId = roomId
+    this.chatId = chatId
+    this.messageId = messageId
+    this.model = model
+    if (usage) {
+      this.promptTokens = usage.prompt_tokens
+      this.completionTokens = usage.completion_tokens
+      this.totalTokens = usage.total_tokens
+      this.estimated = usage.estimated
+    }
+    if (imageUsage && imageUsage.length > 0) {
+      this.imageUsage = imageUsage
+    }
+    this.dateTime = new Date().getTime()
+  }
+}
+
+export class SearchConfig {
+  public enabled: boolean
+  public provider?: SearchServiceProvider
+  public options?: SearchServiceOptions
+  public systemMessageWithSearchResult?: string
+  public systemMessageGetSearchQuery?: string
+}
+
+export enum SearchServiceProvider {
+  Tavily = 'tavily',
+}
+
+export class SearchServiceOptions {
+  public apiKey: string
+  public maxResults?: number
+  public includeRawContent?: boolean
+}
+
+export class Config {
+  constructor(
+    public _id: ObjectId,
+    public timeoutMs: number,
+    public apiKey?: string,
+    public apiDisableDebug?: boolean,
+    public accessToken?: string,
+    public apiBaseUrl?: string,
+    public reverseProxy?: string,
+    public socksProxy?: string,
+    public socksAuth?: string,
+    public httpsProxy?: string,
+    public siteConfig?: SiteConfig,
+    public mailConfig?: MailConfig,
+    public auditConfig?: AuditConfig,
+    public searchConfig?: SearchConfig,
+    public announceConfig?: AnnounceConfig,
+  ) { }
+}
+
+export class SiteConfig {
+  constructor(
+    public siteTitle?: string,
+    public loginEnabled?: boolean,
+    public authProxyEnabled?: boolean,
+    public loginSalt?: string,
+    public registerEnabled?: boolean,
+    public registerReview?: boolean,
+    public registerMails?: string,
+    public siteDomain?: string,
+    public chatModels?: string,
+    public globalAmount?: number,
+    public usageCountLimit?: boolean,
+    public showWatermark?: boolean,
+    public s3Enabled?: boolean,
+    public s3AccessKeyId?: string,
+    public s3SecretAccessKey?: string,
+    public s3Region?: string,
+    public s3Bucket?: string,
+    public s3Endpoint?: string,
+    public s3PathPrefix?: string,
+    public s3CustomDomain?: string,
+    public externalChatSites?: Array<{ name: string, url: string }>,
+  ) { }
+}
+
+export class AnnounceConfig {
+  constructor(
+    public enabled: boolean,
+    public announceWords: string,
+  ) { }
+}
+
+export class MailConfig {
+  constructor(
+    public smtpHost: string,
+    public smtpPort: number,
+    public smtpTsl: boolean,
+    public smtpUserName: string,
+    public smtpPassword: string,
+    public smtpFrom?: string,
+  ) { }
+}
+
+export class AuditConfig {
+  constructor(
+    public enabled: boolean,
+    public provider: TextAuditServiceProvider,
+    public options: TextAuditServiceOptions,
+    public textType: TextAudioType,
+    public customizeEnabled: boolean,
+    public sensitiveWords: string,
+  ) { }
+}
+
+export enum TextAudioType {
+  None = 0,
+  Request = 1, // 二进制 01
+  Response = 2, // 二进制 10
+  All = 3, // 二进制 11
+}
+
+export class KeyConfig {
+  _id: ObjectId
+  key: string
+  keyModel: APIMODEL
+  chatModel: string
+  modelAlias?: string
+  userRoles: UserRole[]
+  status: Status
+  remark: string
+  baseUrl?: string
+  toolsEnabled?: boolean
+  imageUploadEnabled?: boolean
+  defaultThinkEnabled?: boolean
+  defaultSearchEnabled?: boolean
+  inputFidelity?: 'low' | 'medium' | 'high'
+  quality?: 'low' | 'medium' | 'high'
+  imageModel?: 'gpt-image-1' | 'gpt-image-1.5'
+  constructor(key: string, keyModel: APIMODEL, chatModel: string, userRoles: UserRole[], remark: string) {
+    this.key = key
+    this.keyModel = keyModel
+    this.chatModel = chatModel
+    this.userRoles = userRoles
+    this.status = Status.Normal
+    this.remark = remark
+  }
+}
+
+export class BuiltInPrompt {
+  _id: ObjectId
+  title: string
+  value: string
+  order?: string
+  constructor(title: string, value: string) {
+    this.title = title
+    this.value = value
+  }
+}
+
+export class UserPrompt {
+  _id: ObjectId
+  userId: string
+  title: string
+  value: string
+  order?: string
+  constructor(userId: string, title: string, value: string) {
+    this.userId = userId
+    this.title = title
+    this.value = value
+  }
+}
+
+export type APIMODEL = 'ChatGPTAPI' | 'VLLM' | 'FastDeploy' | 'ResponsesAPI'
