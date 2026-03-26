@@ -55,6 +55,117 @@ const currentNavIndexRef = ref<number>(-1)
 // Store the previous tool-call response ID for previousResponseId.
 const lastToolResponseId = ref<string>('')
 
+function isCrossOriginExportAsset(url: string | null) {
+  if (!url || url.startsWith('data:') || url.startsWith('blob:'))
+    return false
+
+  try {
+    return new URL(url, window.location.href).origin !== window.location.origin
+  }
+  catch {
+    return false
+  }
+}
+
+function parseCssNumber(token: string) {
+  const value = token.trim()
+  if (value.endsWith('%'))
+    return Number.parseFloat(value) / 100
+
+  return Number.parseFloat(value)
+}
+
+function parseHue(token: string) {
+  const value = token.trim().toLowerCase()
+  if (value.endsWith('deg'))
+    return Number.parseFloat(value)
+  if (value.endsWith('grad'))
+    return Number.parseFloat(value) * 0.9
+  if (value.endsWith('rad'))
+    return Number.parseFloat(value) * (180 / Math.PI)
+  if (value.endsWith('turn'))
+    return Number.parseFloat(value) * 360
+
+  return Number.parseFloat(value)
+}
+
+function linearToSrgb(value: number) {
+  const normalized = Math.min(1, Math.max(0, value))
+  if (normalized <= 0.0031308)
+    return normalized * 12.92
+
+  return 1.055 * normalized ** (1 / 2.4) - 0.055
+}
+
+function oklchToRgb(value: string) {
+  const body = value.trim().slice(6, -1).trim()
+  const [colorPart, alphaPart] = body.split('/').map(part => part.trim())
+  const tokens = colorPart.split(/\s+/).filter(Boolean)
+  if (tokens.length < 3)
+    return value
+
+  const lightness = parseCssNumber(tokens[0])
+  const chroma = parseCssNumber(tokens[1])
+  const hue = parseHue(tokens[2]) * (Math.PI / 180)
+  const alpha = alphaPart ? parseCssNumber(alphaPart) : null
+
+  if ([lightness, chroma, hue].some(item => Number.isNaN(item)))
+    return value
+
+  const a = chroma * Math.cos(hue)
+  const b = chroma * Math.sin(hue)
+
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3
+
+  const red = Math.round(linearToSrgb(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s) * 255)
+  const green = Math.round(linearToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s) * 255)
+  const blue = Math.round(linearToSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s) * 255)
+
+  if (alpha === null || Number.isNaN(alpha))
+    return `rgb(${red}, ${green}, ${blue})`
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+function replaceUnsupportedColorFunctions(value: string) {
+  if (!value.includes('oklch('))
+    return value
+
+  return value.replace(/oklch\(([^()]+)\)/g, match => oklchToRgb(match))
+}
+
+function sanitizeUnsupportedColorsForExport(exportRoot: HTMLElement) {
+  const elements = [exportRoot, ...Array.from(exportRoot.querySelectorAll<HTMLElement>('*'))]
+
+  elements.forEach((element) => {
+    const style = getComputedStyle(element)
+    for (let index = 0; index < style.length; index++) {
+      const property = style.item(index)
+      const currentValue = style.getPropertyValue(property)
+      if (!currentValue.includes('oklch('))
+        continue
+
+      element.style.setProperty(property, replaceUnsupportedColorFunctions(currentValue))
+    }
+  })
+}
+
+function prepareClonedDocumentForExport(clonedDocument: Document) {
+  const exportRoot = clonedDocument.getElementById('image-wrapper')
+  if (!exportRoot)
+    return
+
+  sanitizeUnsupportedColorsForExport(exportRoot as HTMLElement)
+
+  exportRoot.querySelectorAll('img').forEach((img) => {
+    const src = img.getAttribute('src')
+    if (isCrossOriginExportAsset(src))
+      img.setAttribute('data-html2canvas-ignore', 'true')
+  })
+}
+
 // Initialize lastToolResponseId from history.
 function initLastToolResponseId() {
   // Traverse history to find the last message with editImageId.
@@ -758,8 +869,12 @@ function handleExport() {
       try {
         d.loading = true
         const ele = document.getElementById('image-wrapper')
+        if (!ele)
+          throw new Error('image-wrapper not found')
+
         const canvas = await html2canvas(ele as HTMLDivElement, {
           useCORS: true,
+          onclone: prepareClonedDocumentForExport,
         })
         const imgUrl = canvas.toDataURL('image/png')
         const tempLink = document.createElement('a')
@@ -777,7 +892,8 @@ function handleExport() {
         ms.success(t('chat.exportSuccess'))
         Promise.resolve()
       }
-      catch {
+      catch (error) {
+        console.error('Failed to export chat image:', error)
         ms.error(t('chat.exportFailed'))
       }
       finally {

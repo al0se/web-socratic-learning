@@ -12,11 +12,18 @@ defineProps<Props>()
 const userStore = useUserStore()
 
 const avatar = computed(() => userStore.userInfo.avatar)
+const hasCustomAvatar = computed(() => isString(avatar.value) && avatar.value.length > 0)
+const ignoreAvatarForExport = computed(() => /^https?:\/\//.test(avatar.value ?? ''))
 </script>
 
 <template>
   <template v-if="image">
-    <NAvatar v-if="isString(avatar) && avatar.length > 0 && !onlyDefault" :src="avatar" :fallback-src="defaultAvatar" />
+    <NAvatar
+      v-if="hasCustomAvatar && !onlyDefault"
+      :src="avatar"
+      :fallback-src="defaultAvatar"
+      :data-html2canvas-ignore="ignoreAvatarForExport ? 'true' : undefined"
+    />
     <NAvatar v-else round :src="defaultAvatar" />
   </template>
   <span v-else class="text-[28px] dark:text-white">
