@@ -1,6 +1,5 @@
 import type { Collection, Filter, WithId } from 'mongodb'
 import type {
-  BuiltInPrompt,
   ChatOptions,
   Config,
   GiftCard,
@@ -29,7 +28,6 @@ let userCol: Collection<UserInfo>
 let configCol: Collection<Config>
 let usageCol: Collection<ChatUsage>
 let keyCol: Collection<KeyConfig>
-let builtInPromptCol: Collection<BuiltInPrompt>
 let userPromptCol: Collection<UserPrompt>
 let redeemCol: Collection<GiftCard>
 
@@ -57,7 +55,7 @@ async function initializeIndexes() {
     // Index for getChatRoomsCount aggregation lookup
     await roomCol.createIndex({ roomId: 1 }, { name: 'idx_roomId' })
 
-    globalThis.console.log('✓ chat_room collection indexes created')
+    globalThis.console.log('chat_room collection indexes created')
 
     // ============================================
     // chat collection indexes
@@ -88,7 +86,7 @@ async function initializeIndexes() {
     // Index for deleteAllChatRooms: updateMany({ userId, status: Status.Normal }, ...)
     await chatCol.createIndex({ userId: 1, status: 1 }, { name: 'idx_userId_status' })
 
-    globalThis.console.log('✓ chat collection indexes created')
+    globalThis.console.log('chat collection indexes created')
 
     // ============================================
     // user collection indexes
@@ -107,7 +105,7 @@ async function initializeIndexes() {
     // Index for getUsers: { status: { $ne: Status.Deleted } } with sort by createTime
     await userCol.createIndex({ status: 1, createTime: -1 }, { name: 'idx_status_createTime' })
 
-    globalThis.console.log('✓ user collection indexes created')
+    globalThis.console.log('user collection indexes created')
 
     // ============================================
     // chat_usage collection indexes
@@ -115,7 +113,7 @@ async function initializeIndexes() {
     // Index for getUserStatisticsByDay: { dateTime, userId }
     await usageCol.createIndex({ dateTime: 1, userId: 1 }, { name: 'idx_dateTime_userId' })
 
-    globalThis.console.log('✓ chat_usage collection indexes created')
+    globalThis.console.log('chat_usage collection indexes created')
 
     // ============================================
     // giftcards collection indexes
@@ -131,7 +129,7 @@ async function initializeIndexes() {
       }
     }
 
-    globalThis.console.log('✓ giftcards collection indexes created')
+    globalThis.console.log('giftcards collection indexes created')
 
     // ============================================
     // user_prompt collection indexes
@@ -148,22 +146,7 @@ async function initializeIndexes() {
       }
     }
 
-    globalThis.console.log('✓ user_prompt collection indexes created')
-
-    // ============================================
-    // built_in_prompt collection indexes
-    // ============================================
-    // Unique prompt title (key).
-    try {
-      await builtInPromptCol.createIndex({ title: 1 }, { name: 'uidx_title', unique: true })
-    }
-    catch (error: any) {
-      if (!error.message?.includes('E11000') && !error.message?.includes('duplicate key')) {
-        throw error
-      }
-    }
-
-    globalThis.console.log('✓ built_in_prompt collection indexes created')
+    globalThis.console.log('user_prompt collection indexes created')
 
     // ============================================
     // key_config collection indexes
@@ -171,13 +154,13 @@ async function initializeIndexes() {
     // Index for getKeys: { status: { $ne: Status.Disabled } }
     await keyCol.createIndex({ status: 1 }, { name: 'idx_status' })
 
-    globalThis.console.log('✓ key_config collection indexes created')
+    globalThis.console.log('key_config collection indexes created')
 
-    globalThis.console.log('✓ All database indexes initialized successfully')
+    globalThis.console.log('All database indexes initialized successfully')
   }
   catch (error: any) {
     // Log error but don't throw - allow application to start even if index creation fails
-    globalThis.console.error('⚠ Warning: Error initializing database indexes:', error.message)
+    globalThis.console.error('Warning: Error initializing database indexes:', error.message)
     globalThis.console.error('  Application will continue to start. You may need to create indexes manually.')
   }
 }
@@ -204,7 +187,7 @@ export async function initializeMongoDB() {
 
     // Connect to MongoDB
     await client.connect()
-    globalThis.console.log('✓ MongoDB connected successfully')
+    globalThis.console.log('MongoDB connected successfully')
 
     // Initialize collections
     const db = client.db(dbName)
@@ -214,7 +197,6 @@ export async function initializeMongoDB() {
     configCol = db.collection<Config>('config')
     usageCol = db.collection<ChatUsage>('chat_usage')
     keyCol = db.collection<KeyConfig>('key_config')
-    builtInPromptCol = db.collection<BuiltInPrompt>('built_in_prompt')
     userPromptCol = db.collection<UserPrompt>('user_prompt')
     redeemCol = db.collection<GiftCard>('giftcards')
 
@@ -224,7 +206,7 @@ export async function initializeMongoDB() {
     isInitialized = true
   }
   catch (error: any) {
-    globalThis.console.error('✗ Error initializing MongoDB:', error.message)
+    globalThis.console.error('Error initializing MongoDB:', error.message)
     // Don't throw - allow application to continue
     // MongoDB operations will fail gracefully if connection is not established
   }
@@ -1158,7 +1140,7 @@ export async function getUserStatisticsByModel(start?: number, end?: number): Pr
         imageCount: totalImageCount,
         imageTokens: totalImageTokens,
         usageCount: totalUsageCount,
-        dates, // 添加按日期分组的数据
+        dates, // Grouped statistics by day
       })
     })
 
@@ -1192,29 +1174,6 @@ export async function updateApiKeyStatus(id: string, status: Status) {
   await keyCol.updateOne({ _id: new ObjectId(id) }, { $set: { status } })
 }
 
-export async function getBuiltInPromptList(): Promise<{ data: BuiltInPrompt[], total: number }> {
-  const total = await builtInPromptCol.countDocuments()
-  const cursor = builtInPromptCol.find().sort({ order: 1, _id: -1 })
-  const data = await cursor.toArray()
-  return { data, total }
-}
-
-export async function upsertBuiltInPrompt(builtInPrompt: BuiltInPrompt): Promise<BuiltInPrompt> {
-  if (builtInPrompt._id === undefined) {
-    const doc = await builtInPromptCol.insertOne(builtInPrompt)
-    builtInPrompt._id = doc.insertedId
-  }
-  else {
-    await builtInPromptCol.replaceOne({ _id: builtInPrompt._id }, builtInPrompt, { upsert: true })
-  }
-  return builtInPrompt
-}
-
-export async function deleteBuiltInPrompt(id: string) {
-  const query = { _id: new ObjectId(id) }
-  await builtInPromptCol.deleteOne(query)
-}
-
 export async function upsertUserPrompt(userPrompt: UserPrompt): Promise<UserPrompt> {
   if (userPrompt._id === undefined) {
     const doc = await userPromptCol.insertOne(userPrompt)
@@ -1225,6 +1184,7 @@ export async function upsertUserPrompt(userPrompt: UserPrompt): Promise<UserProm
   }
   return userPrompt
 }
+
 export async function getUserPromptList(userId: string): Promise<{ data: UserPrompt[], total: number }> {
   const query = { userId }
   const total = await userPromptCol.countDocuments(query)

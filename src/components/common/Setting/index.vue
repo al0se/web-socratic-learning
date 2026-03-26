@@ -5,7 +5,6 @@ import { useAuthStore, useUserStore } from '@/store'
 import About from './About.vue'
 import Announcement from './Anonuncement.vue'
 import Audit from './Audit.vue'
-import BuiltInPrompt from './BuiltInPrompt.vue'
 import General from './General.vue'
 import Gift from './Gift.vue'
 import Key from './Keys.vue'
@@ -133,13 +132,6 @@ const show = computed({
           <span class="ml-2">{{ t('setting.model.management') }}</span>
         </template>
         <Key />
-      </NTabPane>
-      <NTabPane v-if="userStore.userInfo.root" name="BuiltInPromptConfig" tab="BuiltInPromptConfig">
-        <template #tab>
-          <IconRiChatQuoteLine class="text-lg" />
-          <span class="ml-2">{{ t('setting.builtInPromptConfig') }}</span>
-        </template>
-        <BuiltInPrompt />
       </NTabPane>
       <NTabPane v-if="userStore.userInfo.root" name="SiteConfig" tab="SiteConfig">
         <template #tab>

@@ -211,8 +211,6 @@
         "action": "Actions"
       }
     },
-    "builtInPromptConfig": "Built-in Prompts",
-    "builtInPromptDeleteConfirm": "Are you sure to delete this built-in prompt?",
     "userRoles": "User Role",
     "status": "Status",
     "chatModels": "Chat Models",

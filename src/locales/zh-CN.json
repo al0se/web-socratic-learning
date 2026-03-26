@@ -211,8 +211,6 @@
         "action": "操作"
       }
     },
-    "builtInPromptConfig": "内置提示词",
-    "builtInPromptDeleteConfirm": "确定删除该内置提示词吗？",
     "userRoles": "用户权限",
     "status": "状态",
     "chatModels": "对话模型",

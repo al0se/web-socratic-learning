@@ -211,8 +211,6 @@
         "action": "操作"
       }
     },
-    "builtInPromptConfig": "組み込みプロンプト",
-    "builtInPromptDeleteConfirm": "この組み込みプロンプトを削除しますか？",
     "userRoles": "ユーザーロール",
     "status": "ステータス",
     "chatModels": "チャットモデル",
