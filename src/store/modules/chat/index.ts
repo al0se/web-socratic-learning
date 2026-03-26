@@ -61,7 +61,6 @@ export const useChatStore = defineStore('chat-store', () => {
       usingContext: result.data?.usingContext ?? true,
       maxContextCount: result.data?.maxContextCount ?? 10,
       searchEnabled: result.data?.searchEnabled,
-      thinkEnabled: false,
       toolsEnabled: result.data?.toolsEnabled,
       imageUploadEnabled: result.data?.imageUploadEnabled,
     })

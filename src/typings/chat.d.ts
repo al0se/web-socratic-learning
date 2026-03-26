@@ -51,7 +51,6 @@ declare namespace Chat {
     maxContextCount: number
     chatModel: string
     searchEnabled: boolean
-    thinkEnabled: boolean
     toolsEnabled?: boolean
     imageUploadEnabled?: boolean
   }

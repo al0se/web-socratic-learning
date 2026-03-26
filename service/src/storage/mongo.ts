@@ -342,7 +342,6 @@ export async function createChatRoom(
   roomId: number,
   chatModel: string,
   maxContextCount: number,
-  thinkEnabled = false,
   searchEnabled = true,
 ) {
   const config = await getCacheConfig()
@@ -352,7 +351,7 @@ export async function createChatRoom(
   if (maxContextCount === undefined) {
     maxContextCount = 10
   }
-  const room = new ChatRoom(userId, title, roomId, chatModel, true, maxContextCount, searchEnabled, thinkEnabled, false)
+  const room = new ChatRoom(userId, title, roomId, chatModel, true, maxContextCount, searchEnabled, false)
   // After room creation, set imageUploadEnabled based on chatModel.
   // Initialize as false here; the room-create API will set it dynamically.
   room.imageUploadEnabled = false
@@ -415,17 +414,6 @@ export async function updateRoomSearchEnabled(userId: string, roomId: number, se
   const update = {
     $set: {
       searchEnabled,
-    },
-  }
-  const result = await roomCol.updateOne(query, update)
-  return result.modifiedCount > 0
-}
-
-export async function updateRoomThinkEnabled(userId: string, roomId: number, thinkEnabled: boolean) {
-  const query = { userId, roomId }
-  const update = {
-    $set: {
-      thinkEnabled,
     },
   }
   const result = await roomCol.updateOne(query, update)

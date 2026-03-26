@@ -36,7 +36,6 @@ router.get('/chatrooms', auth, async (req, res) => {
         maxContextCount: r.maxContextCount === undefined ? 10 : r.maxContextCount,
         chatModel: r.chatModel,
         searchEnabled: !!r.searchEnabled,
-        thinkEnabled: false,
         toolsEnabled: !!r.toolsEnabled,
         imageUploadEnabled: !!r.imageUploadEnabled,
       })
@@ -124,7 +123,6 @@ router.post('/room-create', auth, async (req, res) => {
       roomId,
       resolvedChatModel || '',
       user.config?.maxContextCount,
-      false,
       defaultSearchEnabled,
     )
     // Set imageUploadEnabled based on chatModel.
@@ -150,7 +148,6 @@ router.post('/room-create', auth, async (req, res) => {
 
       await updateRoomImageUploadEnabled(userId, roomId, imageUploadEnabled || false)
       await updateRoomToolsEnabled(userId, roomId, toolsEnabled || false)
-      room.thinkEnabled = false
       room.searchEnabled = defaultSearchEnabled
       room.imageUploadEnabled = imageUploadEnabled || false
       room.toolsEnabled = toolsEnabled || false
