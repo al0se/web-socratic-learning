@@ -2,8 +2,11 @@ import type { TextAuditServiceProvider } from 'src/utils/textAudit'
 import * as process from 'node:process'
 import { ObjectId } from 'mongodb'
 import { isNotEmptyString, isTextAuditServiceProvider } from '../utils/is'
-import { AnnounceConfig, AuditConfig, Config, KeyConfig, MailConfig, SearchConfig, SiteConfig, TextAudioType, UserRole } from './model'
+import { AnnounceConfig, AuditConfig, Config, KeyConfig, MailConfig, SearchConfig, SearchServiceProvider, SiteConfig, TextAudioType, UserRole } from './model'
 import { getConfig, getKeys, upsertKey } from './mongo'
+
+const DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE = 'Current time: {current_time}. Decide whether web search is needed for the user request. If web search is needed, return exactly one query wrapped in <search_query>...</search_query>. If web search is not needed, return <search_query></search_query>. Do not answer the user. Do not output any other text. Keep the query under 300 characters.'
+const DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE = 'Current time: {current_time}. Web search results are provided in the conversation. Use them as the primary source for recent or time-sensitive facts. If the provided search results are sufficient, do not say that you cannot access real-time information. If the results are insufficient or conflicting, say what is missing or uncertain. Respond in the same language as the user.'
 
 let cachedConfig: Config | undefined
 let cacheExpiration = 0
@@ -86,6 +89,12 @@ export async function getOriginConfig() {
     config.searchConfig.enabled = false
     config.searchConfig.options = { apiKey: '', maxResults: 10, includeRawContent: false }
   }
+  if (!isNotEmptyString(config.searchConfig.provider))
+    config.searchConfig.provider = SearchServiceProvider.Tavily
+  if (!isNotEmptyString(config.searchConfig.systemMessageGetSearchQuery))
+    config.searchConfig.systemMessageGetSearchQuery = DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE
+  if (!isNotEmptyString(config.searchConfig.systemMessageWithSearchResult))
+    config.searchConfig.systemMessageWithSearchResult = DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE
 
   if (!isNotEmptyString(config.siteConfig.chatModels))
     config.siteConfig.chatModels = 'gpt-5.2,gpt-5-mini,gpt-5-nano'

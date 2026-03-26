@@ -15,8 +15,18 @@ import { convertImageUrl, saveBase64ToFile } from '../utils/image'
 import { hasAnyRole, isNotEmptyString } from '../utils/is'
 import { textAuditServices } from '../utils/textAudit'
 
-function renderSystemMessage(template: string, currentTime: string): string {
-  return template.replace(/\{current_time\}/g, currentTime)
+const DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE = 'Current time: {current_time}. Decide whether web search is needed for the user request. If web search is needed, return exactly one query wrapped in <search_query>...</search_query>. If web search is not needed, return <search_query></search_query>. Do not answer the user. Do not output any other text. Keep the query under 300 characters.'
+const DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE = 'Current time: {current_time}. Web search results are provided in the conversation. Use them as the primary source for recent or time-sensitive facts. If the provided search results are sufficient, do not say that you cannot access real-time information. If the results are insufficient or conflicting, say what is missing or uncertain. Respond in the same language as the user.'
+
+function renderSystemMessage(template: string | undefined, currentTime: string, fallbackTemplate = ''): string {
+  const finalTemplate = isNotEmptyString(template) ? template : fallbackTemplate
+  return finalTemplate.replace(/\{current_time\}/g, currentTime)
+}
+
+function combineInstructions(baseInstruction: string, extraInstruction: string): string {
+  if (!isNotEmptyString(extraInstruction))
+    return baseInstruction
+  return `${baseInstruction}\n\n${extraInstruction}`
 }
 
 /**
@@ -178,7 +188,8 @@ async function chatReplyProcess(options: RequestOptions) {
         searching: true,
       })
       try {
-        const systemMessageGetSearchQuery = renderSystemMessage(searchConfig.systemMessageGetSearchQuery, dayjs().format('YYYY-MM-DD HH:mm:ss'))
+        const currentTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
+        const systemMessageGetSearchQuery = renderSystemMessage(searchConfig.systemMessageGetSearchQuery, currentTime, DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE)
 
         // Use Responses API or Chat Completions to get search query
         let searchQuery: string = ''
@@ -274,7 +285,8 @@ search query: <search_query>${searchQuery}</search_query>
 search result: <search_result>${searchResultContent}</search_result>`,
           })
 
-          instructions = renderSystemMessage(searchConfig.systemMessageWithSearchResult, dayjs().format('YYYY-MM-DD HH:mm:ss'))
+          const searchResultInstruction = renderSystemMessage(searchConfig.systemMessageWithSearchResult, currentTime, DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE)
+          instructions = combineInstructions(systemMessage, searchResultInstruction)
           if (key.keyModel !== 'ResponsesAPI') {
             (messages as OpenAI.Chat.ChatCompletionMessageParam[])[0].content = instructions
           }

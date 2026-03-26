@@ -16,6 +16,9 @@ const serviceOptions: { label: string, key: SearchServiceProvider, value: Search
   { label: 'Tavily', key: 'tavily', value: 'tavily' },
 ]
 
+const DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE = 'Current time: {current_time}. Decide whether web search is needed for the user request. If web search is needed, return exactly one query wrapped in <search_query>...</search_query>. If web search is not needed, return <search_query></search_query>. Do not answer the user. Do not output any other text. Keep the query under 300 characters.'
+const DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE = 'Current time: {current_time}. Web search results are provided in the conversation. Use them as the primary source for recent or time-sensitive facts. If the provided search results are sufficient, do not say that you cannot access real-time information. If the results are insufficient or conflicting, say what is missing or uncertain. Respond in the same language as the user.'
+
 const config = ref<SearchConfig>()
 
 async function fetchConfig() {
@@ -23,13 +26,19 @@ async function fetchConfig() {
     loading.value = true
     const { data } = await fetchChatConfig<ConfigState>()
     if (!data.searchConfig)
-      data.searchConfig = new SearchConfig(false, '', { apiKey: '' }, '', '')
+      data.searchConfig = new SearchConfig(false, 'tavily', { apiKey: '' }, DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE, DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE)
     if (!data.searchConfig.options)
       data.searchConfig.options = { apiKey: '' }
     if (!data.searchConfig.options.maxResults)
       data.searchConfig.options.maxResults = 10
     if (data.searchConfig.options.includeRawContent === undefined)
       data.searchConfig.options.includeRawContent = false
+    if (!data.searchConfig.provider)
+      data.searchConfig.provider = 'tavily'
+    if (!data.searchConfig.systemMessageWithSearchResult)
+      data.searchConfig.systemMessageWithSearchResult = DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE
+    if (!data.searchConfig.systemMessageGetSearchQuery)
+      data.searchConfig.systemMessageGetSearchQuery = DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE
     config.value = data.searchConfig
   }
   finally {
