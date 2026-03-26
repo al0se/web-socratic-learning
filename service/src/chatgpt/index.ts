@@ -307,17 +307,8 @@ search result: <search_result>${searchResultContent}</search_result>`,
     // Choose API by key model
     // ResponsesAPI branch (OpenAI Responses API)
     if (key.keyModel === 'ResponsesAPI') {
-      let reasoning: OpenAI.Reasoning
-      if (options.room.thinkEnabled) {
-        reasoning = {
-          effort: 'high',
-          summary: 'detailed',
-        }
-      }
-      else {
-        reasoning = {
-          effort: model.startsWith('gpt-5.') ? 'none' : 'minimal',
-        }
+      let reasoning: OpenAI.Reasoning = {
+        effort: model.startsWith('gpt-5.') ? 'none' : 'minimal',
       }
 
       // Models that start with 'gpt' and end with 'chat-latest' (e.g., gpt-5.1-chat-latest, gpt-5.2-chat-latest)
@@ -326,15 +317,7 @@ search result: <search_result>${searchResultContent}</search_result>`,
         reasoning = {}
       }
       if (options.room.toolsEnabled) {
-        if (options.room.thinkEnabled) {
-          reasoning = {
-            effort: 'high',
-            summary: 'detailed',
-          }
-        }
-        else {
-          reasoning = {}
-        }
+        reasoning = {}
       }
 
       // Use keyConfig when tools includes image_generation and keyConfig is present.
@@ -507,18 +490,6 @@ search result: <search_result>${searchResultContent}</search_result>`,
       stream_options: {
         include_usage: true,
       },
-    }
-    if (key.keyModel === 'VLLM') {
-      // @ts-expect-error vLLM supports a set of parameters that are not part of the OpenAI API.
-      chatCompletionCreateBody.chat_template_kwargs = {
-        enable_thinking: options.room.thinkEnabled,
-      }
-    }
-    else if (key.keyModel === 'FastDeploy') {
-      chatCompletionCreateBody.metadata = {
-        // @ts-expect-error FastDeploy supports a set of parameters that are not part of the OpenAI API.
-        enable_thinking: options.room.thinkEnabled,
-      }
     }
     const stream = await openai.chat.completions.create(
       chatCompletionCreateBody,

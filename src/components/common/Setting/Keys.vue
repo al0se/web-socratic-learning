@@ -353,16 +353,6 @@ onMounted(async () => {
             </div>
           </div>
           <div class="flex items-center space-x-4">
-            <span class="shrink-0 w-[100px]">{{ t('setting.model.defaultThinkEnabled') }}</span>
-            <div class="flex-1">
-              <NSwitch
-                :round="false"
-                :value="keyConfig.defaultThinkEnabled || false"
-                @update:value="(val) => { keyConfig.defaultThinkEnabled = val }"
-              />
-            </div>
-          </div>
-          <div class="flex items-center space-x-4">
             <span class="shrink-0 w-[100px]">{{ t('setting.model.defaultSearchEnabled') }}</span>
             <div class="flex-1">
               <NSwitch

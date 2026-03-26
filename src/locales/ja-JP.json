@@ -37,7 +37,7 @@
   },
   "chat": {
     "newChatButton": "新しいチャット",
-    "placeholder": "何でも聞いてください...(Shift + Enterで改行、\"/\"でプロンプトを起動)",
+    "placeholder": "何でも聞いてください...(Shift + Enterで改行)",
     "placeholderMobile": "何でも聞いてください...",
     "copy": "コピー",
     "copyCode": "コードをコピー",

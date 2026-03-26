@@ -1,5 +1,5 @@
 <script setup lang='ts'>
-import type { AutoCompleteProps, MessageReactive, UploadFileInfo } from 'naive-ui'
+import type { MessageReactive, UploadFileInfo } from 'naive-ui'
 import html2canvas from 'html2canvas'
 import { h } from 'vue'
 import {
@@ -7,12 +7,11 @@ import {
   fetchChatResponseoHistory,
   fetchChatStopResponding,
 } from '@/api'
-import { HoverButton, PromptTypeTag } from '@/components/common'
+import { HoverButton } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import IconPrompt from '@/icons/Prompt.vue'
-import { useAuthStore, useChatStore, usePromptStore, useUserStore } from '@/store'
+import { useAuthStore, useChatStore, useUserStore } from '@/store'
 import { debounce } from '@/utils/functions/debounce'
-import { compareRank } from '@/utils/lexorank'
 import { Message } from './components'
 import HeaderComponent from './components/Header/index.vue'
 import { useChat } from './hooks/useChat'
@@ -73,13 +72,6 @@ function initLastToolResponseId() {
 let loadingms: MessageReactive
 let allmsg: MessageReactive
 let prevScrollTop: number
-
-// Add PromptStore.
-const promptStore = usePromptStore()
-
-// Use storeToRefs so suggestions re-render after store updates.
-// @ts-expect-error TS2339: Property 'promptList' does not exist on type 'StoreToRefs<any>'.
-const { promptList: promptTemplate } = storeToRefs<any>(promptStore)
 
 // Reset loading manually; it may not reset on page refresh.
 dataSources.value.forEach((item, index) => {
@@ -919,17 +911,6 @@ async function handleToggleSearchEnabled() {
     ms.warning(t('chat.turnOffSearch'))
 }
 
-async function handleToggleThinkEnabled() {
-  if (!currentChatRoom.value)
-    return
-
-  await chatStore.setChatThinkEnabled(!currentChatRoom.value.thinkEnabled)
-  if (currentChatRoom.value.thinkEnabled)
-    ms.success(t('chat.turnOnThink'))
-  else
-    ms.warning(t('chat.turnOffThink'))
-}
-
 async function handleToggleUsingContext() {
   if (!currentChatRoom.value)
     return
@@ -939,68 +920,6 @@ async function handleToggleUsingContext() {
     ms.success(t('chat.turnOnContext'))
   else
     ms.warning(t('chat.turnOffContext'))
-}
-
-// Areas for optimization.
-// Search option calculation uses value as key, causing duplicate-value render issues.
-// Ideally key should be used, but renderOption has issues, so value maps back to label.
-const promptTemplateSorted = computed(() => {
-  const sortedPrompts = [...promptTemplate.value].sort((a: { order?: string }, b: { order?: string }) => {
-    return compareRank(a.order, b.order)
-  })
-  const userPrompts = sortedPrompts.filter((item: { type?: string }) => item.type !== 'built-in')
-  const builtInPrompts = sortedPrompts.filter((item: { type?: string }) => item.type === 'built-in')
-  return [...userPrompts, ...builtInPrompts]
-})
-
-const promptValueById = computed(() => {
-  const map = new Map<string, string>()
-  promptTemplateSorted.value.forEach((item: { _id?: string, value?: string }) => {
-    if (item._id)
-      map.set(item._id, item.value ?? '')
-  })
-  return map
-})
-
-const searchOptions = computed(() => {
-  const promptOptions = promptTemplateSorted.value
-  if (prompt.value.startsWith('/')) {
-    return promptOptions
-      .filter((item: { title: string }) => item.title.toLowerCase().includes(prompt.value.substring(1).toLowerCase()))
-      .map((obj: { value: any, _id?: string, type?: 'built-in' | 'user-defined', title?: string }) => {
-        return {
-          label: obj.value,
-          value: obj._id ?? '',
-          title: obj.title,
-          type: obj.type ?? 'user-defined',
-        }
-      })
-  }
-  else {
-    return []
-  }
-})
-
-// Map value back to key label.
-function renderOption(option: { label: string, title?: string, type?: 'built-in' | 'user-defined' }) {
-  if (option.title) {
-    return [
-      h(PromptTypeTag, { type: option.type ?? 'user-defined' }),
-      h('span', { style: { marginLeft: '8px' } }),
-      option.title,
-    ]
-  }
-  return []
-}
-
-type AutoCompleteOnSelect = NonNullable<AutoCompleteProps['onSelect']> extends Array<infer T>
-  ? T
-  : NonNullable<AutoCompleteProps['onSelect']>
-
-const handlePromptSelect: AutoCompleteOnSelect = (value) => {
-  const selectedValue = promptValueById.value.get(String(value))
-  if (selectedValue !== undefined)
-    prompt.value = selectedValue
 }
 
 const placeholder = computed(() => {
@@ -1427,7 +1346,7 @@ onUnmounted(() => {
 
           <div
             v-if="isMobile"
-            class="grid grid-cols-3 justify-items-center gap-[clamp(0.125rem,1vw,0.5rem)]"
+            class="grid grid-cols-2 justify-items-center gap-[clamp(0.125rem,1vw,0.5rem)]"
           >
             <HoverButton
               class="w-full flex justify-center"
@@ -1437,16 +1356,6 @@ onUnmounted(() => {
               <span class="w-full text-[11px] flex items-center justify-center gap-[clamp(0.125rem,0.6vw,0.375rem)] text-center leading-tight">
                 <IconMdiWeb class="text-[12px]" />
                 <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.searchEnabled ? t('chat.searchEnabled') : t('chat.searchDisabled') }}</span>
-              </span>
-            </HoverButton>
-            <HoverButton
-              class="w-full flex justify-center"
-              :class="{ 'text-[#2f9e44]': currentChatRoom?.thinkEnabled, 'text-[#c92a2a]': !currentChatRoom?.thinkEnabled }"
-              @click="handleToggleThinkEnabled"
-            >
-              <span class="w-full text-[11px] flex items-center justify-center gap-[clamp(0.125rem,0.6vw,0.375rem)] text-center leading-tight">
-                <IconMdiLightbulbOutline class="text-[12px]" />
-                <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.thinkEnabled ? t('chat.thinkEnabled') : t('chat.thinkDisabled') }}</span>
               </span>
             </HoverButton>
             <HoverButton
@@ -1517,18 +1426,6 @@ onUnmounted(() => {
             </HoverButton>
             <HoverButton
               v-if="!isMobile"
-              :tooltip="currentChatRoom?.thinkEnabled ? t('chat.clickTurnOffThink') : t('chat.clickTurnOnThink')"
-              :tooltip-help="t('chat.thinkHelp')"
-              :class="{ 'text-[#2f9e44]': currentChatRoom?.thinkEnabled, 'text-[#c92a2a]': !currentChatRoom?.thinkEnabled }"
-              @click="handleToggleThinkEnabled"
-            >
-              <span class="text-sm flex items-center gap-1">
-                <IconMdiLightbulbOutline class="text-base" />
-                <span class="text-xs font-bold tracking-wide">{{ currentChatRoom?.thinkEnabled ? t('chat.thinkEnabled') : t('chat.thinkDisabled') }}</span>
-              </span>
-            </HoverButton>
-            <HoverButton
-              v-if="!isMobile"
               :tooltip="currentChatRoom?.usingContext ? t('chat.clickTurnOffContext') : t('chat.clickTurnOnContext')"
               :tooltip-help="t('chat.contextHelp')"
               :class="{ 'text-[#2f9e44]': currentChatRoom?.usingContext, 'text-[#c92a2a]': !currentChatRoom?.usingContext }"
@@ -1552,23 +1449,16 @@ onUnmounted(() => {
             />
           </div>
           <div class="flex items-center justify-between space-x-2">
-            <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption" @select="handlePromptSelect">
-              <template #default="{ handleInput, handleBlur, handleFocus }">
-                <NInput
-                  ref="inputRef"
-                  v-model:value="prompt"
-                  :disabled="!!authStore.session?.auth && !authStore.token && !authStore.session?.authProxyEnabled"
-                  type="textarea"
-                  :placeholder="placeholder"
-                  :autosize="{ minRows: isMobile ? 2 : 3, maxRows: isMobile ? 4 : 12 }"
-                  @input="handleInput"
-                  @focus="handleFocus"
-                  @blur="handleBlur"
-                  @keypress="handleEnter"
-                  @paste="handlePasteImage"
-                />
-              </template>
-            </NAutoComplete>
+            <NInput
+              ref="inputRef"
+              v-model:value="prompt"
+              :disabled="!!authStore.session?.auth && !authStore.token && !authStore.session?.authProxyEnabled"
+              type="textarea"
+              :placeholder="placeholder"
+              :autosize="{ minRows: isMobile ? 2 : 3, maxRows: isMobile ? 4 : 12 }"
+              @keypress="handleEnter"
+              @paste="handlePasteImage"
+            />
             <NButton type="primary" :disabled="buttonDisabled" @click="handleSubmit">
               <template #icon>
                 <span class="dark:text-black">

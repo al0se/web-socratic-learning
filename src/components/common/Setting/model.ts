@@ -114,7 +114,6 @@ export class KeyConfig {
   baseUrl?: string
   toolsEnabled?: boolean
   imageUploadEnabled?: boolean
-  defaultThinkEnabled?: boolean
   defaultSearchEnabled?: boolean
   inputFidelity?: 'low' | 'medium' | 'high'
   quality?: 'low' | 'medium' | 'high'
@@ -126,7 +125,6 @@ export class KeyConfig {
     this.userRoles = userRoles
     this.status = Status.Normal
     this.remark = remark
-    this.defaultThinkEnabled = false
     this.defaultSearchEnabled = false
   }
 }

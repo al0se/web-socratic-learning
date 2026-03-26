@@ -37,7 +37,7 @@
   },
   "chat": {
     "newChatButton": "새 채팅",
-    "placeholder": "무엇이든 물어보세요...(시프트 + 엔터 = 줄 바꿈, \"/\"로 프롬프트 트리거)",
+    "placeholder": "무엇이든 물어보세요...(시프트 + 엔터 = 줄 바꿈)",
     "placeholderMobile": "무엇이든 물어보세요...",
     "copy": "복사",
     "copyCode": "코드 복사",

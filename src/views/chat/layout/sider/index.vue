@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'vue'
 import type { AnnounceConfig } from '@/components/common/Setting/model'
 import { fetchAnnouncement } from '@/api'
-import { GithubSite, PromptStore, Watermark } from '@/components/common'
+import { GithubSite, Watermark } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { useAppStore, useAuthStore, useChatStore } from '@/store'
 import Footer from './Footer.vue'
@@ -17,7 +17,6 @@ const authStore = useAuthStore()
 const chatStore = useChatStore()
 
 const { isMobile } = useBasicLayout()
-const show = ref(false)
 
 const collapsed = computed(() => appStore.siderCollapsed)
 
@@ -129,14 +128,6 @@ onMounted(async () => {
         <div class="flex-1 min-h-0 pb-4 overflow-hidden">
           <List />
         </div>
-        <div class="p-4">
-          <NButton block @click="show = true">
-            <template #icon>
-              <IconRiStore2Line />
-            </template>
-            {{ t('store.siderButton') }}
-          </NButton>
-        </div>
       </main>
       <Footer />
       <GithubSite class="flex-col-2 text-center m-0" />
@@ -145,7 +136,6 @@ onMounted(async () => {
   <template v-if="isMobile">
     <div v-show="!collapsed" class="fixed inset-0 z-40 bg-black/40" @click="handleUpdateCollapsed" />
   </template>
-  <PromptStore v-model:visible="show" />
   <NModal v-model:show="showNotice" :auto-focus="false" preset="card" :style="{ width: !isMobile ? '33%' : '90%' }">
     <div class="p-4 space-y-5 min-h-[200px]">
       <div class="w-full markdown-body" v-html="notice_text" />

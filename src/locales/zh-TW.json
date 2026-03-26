@@ -37,7 +37,7 @@
   },
   "chat": {
     "newChatButton": "新建對話",
-    "placeholder": "來說點什麼...（Shift + Enter = 換行，\"/\" 觸發提示詞）",
+    "placeholder": "來說點什麼...（Shift + Enter = 換行）",
     "placeholderMobile": "來說點什麼...",
     "copy": "複製",
     "copyCode": "複製代碼",

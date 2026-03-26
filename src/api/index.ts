@@ -384,13 +384,6 @@ export function fetchUpdateChatRoomSearchEnabled<T = any>(searchEnabled: boolean
   })
 }
 
-export function fetchUpdateChatRoomThinkEnabled<T = any>(thinkEnabled: boolean, roomId: number) {
-  return post<T>({
-    url: '/room-think-enabled',
-    data: { thinkEnabled, roomId },
-  })
-}
-
 export function fetchUpdateChatRoomToolsEnabled<T = any>(toolsEnabled: boolean, roomId: number) {
   return post<T>({
     url: '/room-tools-enabled',
