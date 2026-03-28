@@ -2,8 +2,8 @@ version: '3'
 
 services:
   app:
-    image: chatgptweb/chatgpt-web # 总是使用latest,更新时重新pull该tag镜像即可
-    container_name: chatgptweb
+    image: socweb/soc-web # 总是使用latest,更新时重新pull该tag镜像即可
+    container_name: soc-web
     restart: unless-stopped
     ports:
       - 3002:3002
@@ -16,9 +16,9 @@ services:
       # 每小时最大请求次数，可选，默认无限
       MAX_REQUEST_PER_HOUR: 0
       # 网站名称
-      SITE_TITLE: ChatGpt Web
+      SITE_TITLE: soc web
       # mongodb 的连接字符串
-      MONGODB_URL: 'mongodb://chatgpt:xxxx@database:27017'
+      MONGODB_URL: 'mongodb://socweb:xxxx@database:27017'
       # 开启注册之后 密码加密的盐
       PASSWORD_MD5_SALT: anysalt
       # 开启注册之后 超级管理邮箱
@@ -38,9 +38,9 @@ services:
     volumes:
       - mongodb:/data/db
     environment:
-      MONGO_INITDB_ROOT_USERNAME: chatgpt
+      MONGO_INITDB_ROOT_USERNAME: socweb
       MONGO_INITDB_ROOT_PASSWORD: xxxx
-      MONGO_INITDB_DATABASE: chatgpt
+      MONGO_INITDB_DATABASE: socweb
 
   mongo-gui:
     container_name: mongo-gui
@@ -49,7 +49,7 @@ services:
     ports:
       - '4321:4321'
     environment:
-      - MONGO_URL=mongodb://chatgpt:xxxx@database:27017
+      - MONGO_URL=mongodb://socweb:xxxx@database:27017
     links:
       - database
     depends_on:
@@ -57,7 +57,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: chatgptweb-database
+    container_name: soc-web-nginx
     restart: unless-stopped
     ports:
       - '80:80'

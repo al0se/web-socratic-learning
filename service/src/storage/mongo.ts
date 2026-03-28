@@ -12,6 +12,7 @@ import type {
 import * as process from 'node:process'
 import dayjs from 'dayjs'
 import { MongoClient, ObjectId } from 'mongodb'
+import { DEFAULT_ROOM_PROMPT } from '../utils'
 import { hasAnyRole } from '../utils/is'
 import { md5 } from '../utils/security'
 import { getCacheApiKeys, getCacheConfig } from './config'
@@ -352,6 +353,7 @@ export async function createChatRoom(
     maxContextCount = 10
   }
   const room = new ChatRoom(userId, title, roomId, chatModel, true, maxContextCount, searchEnabled, false)
+  room.prompt = DEFAULT_ROOM_PROMPT
   // After room creation, set imageUploadEnabled based on chatModel.
   // Initialize as false here; the room-create API will set it dynamically.
   room.imageUploadEnabled = false

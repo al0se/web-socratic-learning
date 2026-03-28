@@ -10,7 +10,7 @@ import * as undici from 'undici'
 import { getCacheApiKeys, getCacheConfig, getOriginConfig } from '../storage/config'
 import { Status, UsageResponse } from '../storage/model'
 import { getChatByMessageId, updateChatSearchQuery, updateChatSearchResult } from '../storage/mongo'
-import { sendResponse } from '../utils'
+import { DEFAULT_ROOM_PROMPT, sendResponse } from '../utils'
 import { convertImageUrl, saveBase64ToFile } from '../utils/image'
 import { hasAnyRole, isNotEmptyString } from '../utils/is'
 import { textAuditServices } from '../utils/textAudit'
@@ -118,8 +118,6 @@ export async function initApi(key: KeyConfig) {
 }
 
 const processThreads: { userId: string, chatUuid: number, abort: AbortController }[] = []
-const DEFAULT_SYSTEM_MESSAGE = 'You are a helpful assistant. Follow the user\'s instructions carefully. Be concise, accurate, and transparent. Respond in the same language as the user\'s request. Never fabricate facts, sources, or results. If you must make assumptions, state them explicitly. If you are unsure or need more context, say so and ask a clarifying question. Respond in Markdown (LaTeX with $...$).'
-
 async function chatReplyProcess(options: RequestOptions) {
   const globalConfig = await getCacheConfig()
   const chatModelWithKeyId = options.room.chatModel
@@ -134,7 +132,7 @@ async function chatReplyProcess(options: RequestOptions) {
     throw new Error('没有对应的apikeys配置。请再试一次 | No available apikeys configuration. Please try again.')
 
   const { message, uploadFileKeys, parentMessageId, previousResponseId, tools, process, chatUuid } = options
-  const systemMessage = isNotEmptyString(options.room.prompt) ? options.room.prompt : DEFAULT_SYSTEM_MESSAGE
+  const systemMessage = isNotEmptyString(options.room.prompt) ? options.room.prompt : DEFAULT_ROOM_PROMPT
   let instructions = systemMessage
 
   try {

@@ -679,7 +679,7 @@ router.get('/user-2fa', auth, async (req, res) => {
       data.enaled = true
     }
     else {
-      const secret = speakeasy.generateSecret({ length: 20, name: `CHATGPT-WEB:${user.email}` })
+      const secret = speakeasy.generateSecret({ length: 20, name: `SOC WEB:${user.email}` })
       data.otpauthUrl = secret.otpauth_url
       data.enaled = false
       data.secretKey = secret.base32

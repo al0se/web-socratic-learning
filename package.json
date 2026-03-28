@@ -1,12 +1,13 @@
 {
-  "name": "chatgpt-web",
+  "name": "soc-web",
   "type": "module",
   "version": "2.13.3",
   "private": false,
-  "description": "ChatGPT Web",
-  "author": "ChatGPT Web Contributors <dev@chatgpt-web.dev>",
+  "description": "soc web",
+  "author": "soc web Contributors",
   "keywords": [
-    "chatgpt-web",
+    "soc-web",
+    "soc web",
     "chatgpt",
     "chatbot",
     "vue"

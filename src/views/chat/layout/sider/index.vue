@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'vue'
 import type { AnnounceConfig } from '@/components/common/Setting/model'
 import { fetchAnnouncement } from '@/api'
-import { GithubSite, Watermark } from '@/components/common'
+import { Watermark } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { useAppStore, useAuthStore, useChatStore } from '@/store'
 import Footer from './Footer.vue'
@@ -130,7 +130,6 @@ onMounted(async () => {
         </div>
       </main>
       <Footer />
-      <GithubSite class="flex-col-2 text-center m-0" />
     </div>
   </NLayoutSider>
   <template v-if="isMobile">

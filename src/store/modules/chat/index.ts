@@ -57,6 +57,7 @@ export const useChatStore = defineStore('chat-store', () => {
       title,
       roomId,
       isEdit: false,
+      prompt: result.data?.prompt,
       chatModel: result.data?.chatModel,
       usingContext: result.data?.usingContext ?? true,
       maxContextCount: result.data?.maxContextCount ?? 10,

@@ -17,6 +17,7 @@ import {
   updateRoomToolsEnabled,
   updateRoomUsingContext,
 } from '../storage/mongo'
+import { DEFAULT_ROOM_PROMPT } from '../utils'
 import { hasAnyRole } from '../utils/is'
 
 export const router = Router()
@@ -31,7 +32,7 @@ router.get('/chatrooms', auth, async (req, res) => {
         roomId: r.roomId,
         title: r.title,
         isEdit: false,
-        prompt: r.prompt,
+        prompt: r.prompt || DEFAULT_ROOM_PROMPT,
         usingContext: r.usingContext === undefined ? true : r.usingContext,
         maxContextCount: r.maxContextCount === undefined ? 10 : r.maxContextCount,
         chatModel: r.chatModel,
