@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { useBasicLayout } from '@/hooks/useBasicLayout'
 
 interface Props {
   visible: boolean
@@ -15,8 +14,6 @@ const emit = defineEmits<{
   'update:currentIndex': [value: number]
   'close': []
 }>()
-
-const { isMobile: _isMobile } = useBasicLayout()
 
 // Image zoom state.
 const imageScale = ref(1)

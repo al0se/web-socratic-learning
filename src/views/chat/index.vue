@@ -1411,7 +1411,6 @@ onUnmounted(() => {
                   :search-results="item?.searchResults"
                   :search-usage-time="item?.searchUsageTime"
                   :reasoning="item?.reasoning"
-                  :finish-reason="item?.finish_reason"
                   :text="item.text"
                   :images="item.images"
                   :tool-images="item.tool_images"

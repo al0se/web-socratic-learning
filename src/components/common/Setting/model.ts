@@ -129,18 +129,6 @@ export class KeyConfig {
   }
 }
 
-export class UserPrompt {
-  _id?: string
-  title: string
-  value: string
-  type?: 'user-defined'
-  order?: string
-  constructor(title: string, value: string) {
-    this.title = title
-    this.value = value
-  }
-}
-
 export type APIMODEL = 'ChatGPTAPI' | 'VLLM' | 'FastDeploy' | 'ResponsesAPI'
 
 export const apiModelOptions = ['ChatGPTAPI', 'VLLM', 'FastDeploy', 'ResponsesAPI'].map((model: string) => {

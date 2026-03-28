@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { fetchUpdateChatRoomPrompt } from '@/api'
 import { useChatStore } from '@/store'
+import defaultPromptText from '../../../../prompt/prompt.txt?raw'
 
 const props = defineProps<Props>()
 
@@ -12,7 +13,9 @@ const chatStore = useChatStore()
 const currentChatHistory = computed(() => chatStore.getChatRoomByCurrentActive)
 const ms = useMessage()
 const testing = ref(false)
-const title = `Prompt For [${currentChatHistory.value?.title}]`
+const promptDraft = ref('')
+const fallbackPrompt = defaultPromptText.trim() || defaultPromptText
+const title = computed(() => `Prompt For [${currentChatHistory.value?.title ?? ''}]`)
 
 interface Props {
   visible: boolean
@@ -32,13 +35,30 @@ const show = computed({
   },
 })
 
+function syncPromptDraft() {
+  const roomPrompt = currentChatHistory.value?.prompt
+  promptDraft.value = roomPrompt && roomPrompt.trim() !== '' ? roomPrompt : fallbackPrompt
+}
+
+watch(
+  [show, () => currentChatHistory.value?.roomId],
+  ([visible]) => {
+    if (visible)
+      syncPromptDraft()
+  },
+  { immediate: true },
+)
+
 async function handleSaveChatRoomPrompt() {
-  if (!currentChatHistory.value || !currentChatHistory.value)
+  if (!currentChatHistory.value)
     return
+
+  const promptToSave = promptDraft.value.trim() !== '' ? promptDraft.value : fallbackPrompt
 
   testing.value = true
   try {
-    const { message } = await fetchUpdateChatRoomPrompt(currentChatHistory.value.prompt ?? '', +props.roomId) as { status: string, message: string }
+    const { message } = await fetchUpdateChatRoomPrompt(promptToSave, +props.roomId) as { status: string, message: string }
+    currentChatHistory.value.prompt = promptToSave
     ms.success(message)
     show.value = false
   }
@@ -51,16 +71,20 @@ async function handleSaveChatRoomPrompt() {
 
 <template>
   <NModal
-    v-model:show="show" :auto-focus="false" class="custom-card" preset="card" :style="{ width: '600px' }" :title="title" size="huge"
+    v-model:show="show"
+    :auto-focus="false"
+    class="custom-card"
+    preset="card"
+    :style="{ width: '600px' }"
+    :title="title"
+    size="huge"
     :bordered="false"
   >
-    <!-- <template #header-extra>
-      噢!
-    </template> -->
     <NInput
-      :value="currentChatHistory && currentChatHistory.prompt"
+      v-model:value="promptDraft"
       type="textarea"
-      :autosize="{ minRows: 4, maxRows: 10 }" placeholder="Prompt for this room. Leave empty to use prompt/prompt.txt; if that file is missing or empty, no system prompt will be sent." @input="(val) => { if (currentChatHistory) currentChatHistory.prompt = val }"
+      :autosize="{ minRows: 4, maxRows: 10 }"
+      placeholder="Defaults to prompt/prompt.txt. Saving an empty value falls back to that file."
     />
     <template #footer>
       <NSpace justify="end">

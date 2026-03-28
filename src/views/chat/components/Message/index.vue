@@ -25,7 +25,6 @@ interface Props {
   searchResults?: Chat.SearchResult[]
   searchUsageTime?: number
   reasoning?: string
-  finishReason?: string
   text?: string
   images?: string[]
   toolImages?: string[] // Base64 image data from AI-generated images

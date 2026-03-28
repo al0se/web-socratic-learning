@@ -32,14 +32,14 @@ const previewImageNames = ref<string[]>([]) // 所有预览图片名称
 const currentImageIndex = ref(0) // 当前图片索引
 
 // Open image preview with multi-image support
-function openImagePreview(url: string, name: string, _imageType: 'upload' | 'tool' = 'upload', index?: number) {
+function openImagePreview(url: string, index?: number) {
   // Collect all images.
   const allImages: string[] = []
   const allNames: string[] = []
 
   // Add user-uploaded images.
   if (props.images && props.images.length > 0) {
-    props.images.forEach((v, _i) => {
+    props.images.forEach((v) => {
       allImages.push(getImageUrl(v))
       allNames.push(getImageName(v))
     })
@@ -47,7 +47,7 @@ function openImagePreview(url: string, name: string, _imageType: 'upload' | 'too
 
   // Add AI-generated images.
   if (props.toolImages && props.toolImages.length > 0) {
-    props.toolImages.forEach((v, _i) => {
+    props.toolImages.forEach((v) => {
       allImages.push(getImageUrl(v))
       allNames.push(getImageName(v))
     })
@@ -188,7 +188,7 @@ onUnmounted(() => {
           v-for="(v, i) of images"
           :key="`upload-${i}`"
           class="cursor-pointer hover:opacity-80 transition-opacity"
-          @click="openImagePreview(getImageUrl(v), getImageName(v), 'upload', i)"
+          @click="openImagePreview(getImageUrl(v), i)"
         >
           <img :src="getImageUrl(v)" alt="" width="160px" class="rounded border border-gray-300">
         </div>
@@ -197,7 +197,7 @@ onUnmounted(() => {
           v-for="(v, i) of toolImages"
           :key="`tool-${i}`"
           class="cursor-pointer hover:opacity-80 transition-opacity"
-          @click="openImagePreview(getImageUrl(v), getImageName(v), 'tool', images ? images.length + i : i)"
+          @click="openImagePreview(getImageUrl(v), images ? images.length + i : i)"
         >
           <img :src="getImageUrl(v)" alt="" width="160px" class="rounded border border-gray-300">
         </div>

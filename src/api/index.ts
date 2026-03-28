@@ -1,4 +1,4 @@
-import type { AnnounceConfig, AuditConfig, ConfigState, GiftCard, KeyConfig, MailConfig, SearchConfig, SiteConfig, Status, UserInfo, UserPassword, UserPrompt } from '@/components/common/Setting/model'
+import type { AnnounceConfig, AuditConfig, ConfigState, GiftCard, KeyConfig, MailConfig, SearchConfig, SiteConfig, Status, UserInfo, UserPassword } from '@/components/common/Setting/model'
 import { get, post } from '@/utils/request'
 import fetchService from '@/utils/request/fetchService'
 
@@ -526,38 +526,5 @@ export function fetchUpsertApiKey<T = any>(keyConfig: KeyConfig) {
   return post<T>({
     url: '/setting-key-upsert',
     data: keyConfig,
-  })
-}
-
-export function fetchUserPromptList<T = any>() {
-  return get<T>({
-    url: '/prompt-list',
-  })
-}
-
-export function fetchUpsertUserPrompt<T = any>(userPrompt: UserPrompt) {
-  return post<T>({
-    url: '/prompt-upsert',
-    data: userPrompt,
-  })
-}
-
-export function fetchDeleteUserPrompt<T = any>(id: string) {
-  return post<T>({
-    url: '/prompt-delete',
-    data: { id },
-  })
-}
-
-export function fetchClearUserPrompt<T = any>() {
-  return post<T>({
-    url: '/prompt-clear',
-  })
-}
-
-export function fetchImportUserPrompt<T = any>(dataProps: never[]) {
-  return post<T>({
-    url: '/prompt-import',
-    data: dataProps,
   })
 }
