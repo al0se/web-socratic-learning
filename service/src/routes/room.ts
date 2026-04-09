@@ -34,7 +34,7 @@ router.get('/chatrooms', auth, async (req, res) => {
         isEdit: false,
         prompt: r.prompt || DEFAULT_ROOM_PROMPT,
         usingContext: r.usingContext === undefined ? true : r.usingContext,
-        maxContextCount: r.maxContextCount === undefined ? 10 : r.maxContextCount,
+        maxContextCount: r.maxContextCount === undefined ? 20 : r.maxContextCount,
         chatModel: r.chatModel,
         searchEnabled: !!r.searchEnabled,
         toolsEnabled: !!r.toolsEnabled,

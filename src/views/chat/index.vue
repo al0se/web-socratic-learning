@@ -239,7 +239,7 @@ async function onConversation() {
   let options: Chat.ConversationRequest = {}
   const lastContext = conversationList.value[conversationList.value.length - 1]?.conversationOptions
 
-  if (lastContext && currentChatRoom.value?.usingContext) {
+  if (lastContext) {
     options = { ...lastContext }
   }
   else {
@@ -1027,17 +1027,6 @@ async function handleToggleSearchEnabled() {
     ms.warning(t('chat.turnOffSearch'))
 }
 
-async function handleToggleUsingContext() {
-  if (!currentChatRoom.value)
-    return
-
-  await chatStore.setUsingContext(!currentChatRoom.value.usingContext)
-  if (currentChatRoom.value.usingContext)
-    ms.success(t('chat.turnOnContext'))
-  else
-    ms.warning(t('chat.turnOffContext'))
-}
-
 const placeholder = computed(() => {
   if (isMobile.value)
     return t('chat.placeholderMobile')
@@ -1194,19 +1183,6 @@ async function handleSyncChatModel(chatModel: string) {
       },
     })
   }
-}
-
-function handleUpdateMaxContextCount(maxContextCount: number) {
-  if (currentChatRoom.value) {
-    currentChatRoom.value.maxContextCount = maxContextCount
-  }
-}
-
-async function handleSyncMaxContextCount() {
-  if (!currentChatRoom.value)
-    return
-
-  await chatStore.setMaxContextCount(currentChatRoom.value.maxContextCount)
 }
 
 // https://github.com/tusen-ai/naive-ui/issues/4887
@@ -1380,7 +1356,6 @@ onUnmounted(() => {
     <HeaderComponent
       v-if="isMobile"
       :show-prompt="showPrompt"
-      :using-context="currentChatRoom?.usingContext"
       @export="handleExport"
       @toggle-show-prompt="showPrompt = true"
     />
@@ -1461,7 +1436,7 @@ onUnmounted(() => {
 
           <div
             v-if="isMobile"
-            class="grid grid-cols-2 justify-items-center gap-[clamp(0.125rem,1vw,0.5rem)]"
+            class="grid grid-cols-1 justify-items-center gap-[clamp(0.125rem,1vw,0.5rem)]"
           >
             <HoverButton
               class="w-full flex justify-center"
@@ -1471,16 +1446,6 @@ onUnmounted(() => {
               <span class="w-full text-[11px] flex items-center justify-center gap-[clamp(0.125rem,0.6vw,0.375rem)] text-center leading-tight">
                 <IconMdiWeb class="text-[12px]" />
                 <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.searchEnabled ? t('chat.searchEnabled') : t('chat.searchDisabled') }}</span>
-              </span>
-            </HoverButton>
-            <HoverButton
-              class="w-full flex justify-center"
-              :class="{ 'text-[#2f9e44]': currentChatRoom?.usingContext, 'text-[#c92a2a]': !currentChatRoom?.usingContext }"
-              @click="handleToggleUsingContext"
-            >
-              <span class="w-full text-[11px] flex items-center justify-center gap-[clamp(0.125rem,0.6vw,0.375rem)] text-center leading-tight">
-                <IconRiChatHistoryLine class="text-[12px]" />
-                <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.usingContext ? t('chat.showOnContext') : t('chat.showOffContext') }}</span>
               </span>
             </HoverButton>
           </div>
@@ -1539,29 +1504,6 @@ onUnmounted(() => {
                 <span class="text-xs font-bold tracking-wide">{{ currentChatRoom?.searchEnabled ? t('chat.searchEnabled') : t('chat.searchDisabled') }}</span>
               </span>
             </HoverButton>
-            <HoverButton
-              v-if="!isMobile"
-              :tooltip="currentChatRoom?.usingContext ? t('chat.clickTurnOffContext') : t('chat.clickTurnOnContext')"
-              :tooltip-help="t('chat.contextHelp')"
-              :class="{ 'text-[#2f9e44]': currentChatRoom?.usingContext, 'text-[#c92a2a]': !currentChatRoom?.usingContext }"
-              @click="handleToggleUsingContext"
-            >
-              <span class="text-sm flex items-center gap-1">
-                <IconRiChatHistoryLine class="text-base" />
-                <span class="text-xs font-bold tracking-wide">{{ currentChatRoom?.usingContext ? t('chat.showOnContext') : t('chat.showOffContext') }}</span>
-              </span>
-            </HoverButton>
-            <NSlider
-              :value="currentChatRoom?.maxContextCount"
-              :disabled="!currentChatRoom?.usingContext"
-              :max="40"
-              :min="0"
-              :step="1"
-              style="width: 180px"
-              :format-tooltip="(value: number) => `${t('chat.maxContextCount')}: ${value}`"
-              :on-dragend="handleSyncMaxContextCount"
-              @update:value="handleUpdateMaxContextCount"
-            />
           </div>
           <div class="flex items-center justify-between space-x-2">
             <NInput

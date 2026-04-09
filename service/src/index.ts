@@ -21,12 +21,12 @@ import {
   createUser,
   disableUser2FA,
   getAmtByCardNo,
-  hasAdminUser,
   getUser,
   getUserById,
   getUsers,
   getUserStatisticsByDay,
   getUserStatisticsByModel,
+  hasAdminUser,
   initializeMongoDB,
   updateApiKeyStatus,
   updateConfig,
@@ -259,7 +259,7 @@ router.post('/session', async (req, res) => {
         }
       }
       if (user.config?.maxContextCount === undefined) {
-        user.config.maxContextCount = 10
+        user.config.maxContextCount = 20
       }
 
       userInfo = {

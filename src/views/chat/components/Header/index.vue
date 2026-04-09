@@ -8,7 +8,6 @@ defineProps<Props>()
 const emit = defineEmits<Emit>()
 
 interface Props {
-  usingContext?: boolean
   showPrompt: boolean
 }
 
@@ -64,7 +63,7 @@ function handleShowPrompt() {
       </h1>
       <div class="flex items-center space-x-2">
         <HoverButton @click="handleShowPrompt">
-          <span class="text-xl" :class="{ 'text-[#2f9e44]': usingContext, 'text-[#c92a2a]': !usingContext }">
+          <span class="text-xl text-[#4f555e] dark:text-white">
             <IconPrompt class="w-[20px] m-auto" />
           </span>
         </HoverButton>

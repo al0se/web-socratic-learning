@@ -27,7 +27,7 @@ export function defaultSetting(): UserState {
       name: '',
       description: '',
       root: false,
-      config: { chatModel: '' },
+      config: { chatModel: '', maxContextCount: 20 },
       roles: [],
       useAmount: 1, // chat usage amount
     },
@@ -41,6 +41,8 @@ export function getLocalState(): UserState {
       localSetting.userInfo.config = new UserConfig()
       localSetting.userInfo.config.chatModel = ''
     }
+    if (localSetting.userInfo.config.maxContextCount == null)
+      localSetting.userInfo.config.maxContextCount = 20
   }
   return { ...defaultSetting(), ...localSetting }
 }

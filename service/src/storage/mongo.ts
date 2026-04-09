@@ -350,7 +350,7 @@ export async function createChatRoom(
     chatModel = config?.siteConfig?.chatModels.split(',')[0]
   }
   if (maxContextCount === undefined) {
-    maxContextCount = 10
+    maxContextCount = 20
   }
   const room = new ChatRoom(userId, title, roomId, chatModel, true, maxContextCount, searchEnabled, false)
   room.prompt = DEFAULT_ROOM_PROMPT
@@ -692,7 +692,7 @@ export async function createUser(email: string, password: string, roles?: UserRo
   else {
     userInfo.config.chatModel = defaultModelName || ''
   }
-  userInfo.config.maxContextCount = 10
+  userInfo.config.maxContextCount = 20
 
   await userCol.insertOne(userInfo)
   return userInfo
@@ -713,6 +713,7 @@ export async function updateUserChatModel(userId: string, chatModel: string) {
 
 export async function updateUserMaxContextCount(userId: string, maxContextCount: number) {
   await userCol.updateOne({ _id: new ObjectId(userId) }, { $set: { 'config.maxContextCount': maxContextCount } })
+  await roomCol.updateMany({ userId, status: { $ne: Status.Deleted } }, { $set: { maxContextCount } })
 }
 
 export async function updateUser2FA(userId: string, secretKey: string) {

@@ -245,7 +245,7 @@
     "info2FAStep3Tip1": "참고: 2단계 인증을 끄는 방법?",
     "info2FAStep3Tip2": "1. 로그인 후 2단계 인증 페이지에서 비활성화하세요.",
     "info2FAStep3Tip3": "2. 관리자에게 2단계 인증 비활성화를 요청하세요.",
-    "maxContextCount": "기본 새 세션의 컨텍스트 창에 포함된 최대 메시지 수",
+    "maxContextCount": "모든 대화의 컨텍스트 창에 포함되는 최대 메시지 수",
     "fastDelMsg": "빠르게 메시지 삭제",
     "user": {
       "searchUser": "검색",

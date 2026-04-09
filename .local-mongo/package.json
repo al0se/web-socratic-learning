@@ -1,7 +1,7 @@
 {
   "name": "local-mongo-runtime",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "start": "node start-mongo.mjs"
   },

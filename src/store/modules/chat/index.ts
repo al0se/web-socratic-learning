@@ -7,10 +7,8 @@ import {
   fetchGetChatRooms,
   fetchRenameChatRoom,
   fetchUpdateChatRoomChatModel,
-  fetchUpdateChatRoomMaxContextCount,
   fetchUpdateChatRoomSearchEnabled,
   fetchUpdateChatRoomToolsEnabled,
-  fetchUpdateChatRoomUsingContext,
   fetchUpdateUserChatModel,
   fetchUpdateUserMaxContextCount,
 } from '@/api'
@@ -60,7 +58,7 @@ export const useChatStore = defineStore('chat-store', () => {
       prompt: result.data?.prompt,
       chatModel: result.data?.chatModel,
       usingContext: result.data?.usingContext ?? true,
-      maxContextCount: result.data?.maxContextCount ?? 10,
+      maxContextCount: result.data?.maxContextCount ?? 20,
       searchEnabled: result.data?.searchEnabled,
       toolsEnabled: result.data?.toolsEnabled,
       imageUploadEnabled: result.data?.imageUploadEnabled,
@@ -132,25 +130,15 @@ export const useChatStore = defineStore('chat-store', () => {
     }
   }
 
-  const setUsingContext = async (usingContext: boolean) => {
-    const index = findRoomIndex(state.active)
-    if (index === -1)
-      return
-
-    state.chatRooms[index].usingContext = usingContext
-    await fetchUpdateChatRoomUsingContext(usingContext, state.active!)
-  }
-
   const setMaxContextCount = async (maxContextCount: number) => {
-    const index = findRoomIndex(state.active)
-    if (index === -1)
-      return
-
-    state.chatRooms[index].maxContextCount = maxContextCount
-    await fetchUpdateChatRoomMaxContextCount(maxContextCount, state.active!)
+    state.chatRooms = state.chatRooms.map(room => ({
+      ...room,
+      maxContextCount,
+    }))
 
     const userStore = useUserStore()
     userStore.userInfo.config.maxContextCount = maxContextCount
+    userStore.recordState()
     await fetchUpdateUserMaxContextCount(maxContextCount)
   }
 
@@ -278,7 +266,6 @@ export const useChatStore = defineStore('chat-store', () => {
     // Actions
     syncHistory,
     syncChat,
-    setUsingContext,
     setMaxContextCount,
     setChatModel,
     setChatSearchEnabled,

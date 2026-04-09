@@ -245,7 +245,7 @@
     "info2FAStep3Tip1": "注意：如何關閉兩步驗證？",
     "info2FAStep3Tip2": "1. 登入後，在兩步驗證頁面停用。",
     "info2FAStep3Tip3": "2. 聯絡管理員協助停用兩步驗證。",
-    "maxContextCount": "預設新對話的上下文窗口中包含的最大訊息數量",
+    "maxContextCount": "所有對話的上下文窗口中包含的最大訊息數量",
     "fastDelMsg": "快速刪除訊息",
     "user": {
       "searchUser": "搜尋",

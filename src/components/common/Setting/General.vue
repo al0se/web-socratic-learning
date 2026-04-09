@@ -2,10 +2,10 @@
 import type { Component } from 'vue'
 import type { Language, Theme } from '@/store/modules/app/helper'
 import type { UserInfo } from '@/store/modules/user/helper'
-import { decode_redeemcard, fetchClearAllChat, fetchUpdateUserChatModel, fetchUpdateUserMaxContextCount } from '@/api'
+import { decode_redeemcard, fetchClearAllChat, fetchUpdateUserChatModel } from '@/api'
 import { UserConfig } from '@/components/common/Setting/model'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
-import { useAppStore, useAuthStore, useUserStore } from '@/store'
+import { useAppStore, useAuthStore, useChatStore, useUserStore } from '@/store'
 import { getCurrentDate } from '@/utils/functions'
 
 const { t } = useI18n()
@@ -13,6 +13,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const authStore = useAuthStore()
+const chatStore = useChatStore()
 
 // Fetch usage on page load (deductions happen on the backend).
 onMounted(() => {
@@ -114,9 +115,7 @@ async function updateUserMaxContextCount(maxContextCount: number) {
 }
 
 async function syncUserMaxContextCount() {
-  if (userStore.userInfo.config.maxContextCount) {
-    await fetchUpdateUserMaxContextCount(userStore.userInfo.config.maxContextCount)
-  }
+  await chatStore.setMaxContextCount(userStore.userInfo.config.maxContextCount ?? 20)
 }
 
 function exportData(): void {
@@ -225,7 +224,7 @@ function handleImportButtonClick(): void {
         <span class="shrink-0 w-[100px]">{{ t('setting.maxContextCount') }}</span>
         <div class="w-[300px]">
           <NSlider
-            :value="userInfo.config.maxContextCount"
+            :value="userInfo.config.maxContextCount ?? 20"
             :max="40"
             :min="0"
             :step="1"
