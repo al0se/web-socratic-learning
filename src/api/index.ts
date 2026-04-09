@@ -1,4 +1,4 @@
-import type { AnnounceConfig, AuditConfig, ConfigState, GiftCard, KeyConfig, MailConfig, SearchConfig, SiteConfig, Status, UserInfo, UserPassword } from '@/components/common/Setting/model'
+import type { AnnounceConfig, AuditConfig, ConfigState, GiftCard, KeyConfig, KnowledgeGraphConfig, MailConfig, SearchConfig, SiteConfig, Status, UserInfo, UserPassword } from '@/components/common/Setting/model'
 import { get, post } from '@/utils/request'
 import fetchService from '@/utils/request/fetchService'
 
@@ -19,9 +19,12 @@ interface SSEEventHandlers {
   onMessage?: (data: any) => void
   onDelta?: (delta: { reasoning?: string, text?: string }) => void
   onSearching?: (data: { searching: boolean }) => void
+  onKnowledgeGraphSearching?: (data: { knowledgeGraphSearching: boolean }) => void
   onGenerating?: (data: { generating: boolean }) => void
   onSearchQuery?: (data: { searchQuery: string }) => void
   onSearchResults?: (data: { searchResults: any[], searchUsageTime: number }) => void
+  onKnowledgeGraphQuery?: (data: { knowledgeGraphQuery: string }) => void
+  onKnowledgeGraphResults?: (data: { knowledgeGraphResults: any[], knowledgeGraphUsageTime: number }) => void
   onToolCalls?: (data: { tool_calls?: Array<{ type: string, result?: string }> }) => void
   onComplete?: (data: any) => void
   onError?: (error: string) => void
@@ -107,6 +110,9 @@ export function fetchChatAPIProcessSSE(
               else if (jsonData.searching !== undefined) {
                 handlers.onSearching?.(jsonData)
               }
+              else if (jsonData.knowledgeGraphSearching !== undefined) {
+                handlers.onKnowledgeGraphSearching?.(jsonData)
+              }
               else if (jsonData.generating !== undefined) {
                 handlers.onGenerating?.(jsonData)
               }
@@ -115,6 +121,12 @@ export function fetchChatAPIProcessSSE(
               }
               else if (jsonData.searchResults) {
                 handlers.onSearchResults?.(jsonData)
+              }
+              else if (jsonData.knowledgeGraphQuery) {
+                handlers.onKnowledgeGraphQuery?.(jsonData)
+              }
+              else if (jsonData.knowledgeGraphResults) {
+                handlers.onKnowledgeGraphResults?.(jsonData)
               }
               else if (jsonData.tool_calls) {
                 handlers.onToolCalls?.(jsonData)
@@ -384,6 +396,13 @@ export function fetchUpdateChatRoomSearchEnabled<T = any>(searchEnabled: boolean
   })
 }
 
+export function fetchUpdateChatRoomKnowledgeGraphEnabled<T = any>(knowledgeGraphEnabled: boolean, roomId: number) {
+  return post<T>({
+    url: '/room-knowledge-graph-enabled',
+    data: { knowledgeGraphEnabled, roomId },
+  })
+}
+
 export function fetchUpdateChatRoomToolsEnabled<T = any>(toolsEnabled: boolean, roomId: number) {
   return post<T>({
     url: '/room-tools-enabled',
@@ -471,6 +490,20 @@ export function fetchTestSearch<T = any>(text: string, search: SearchConfig) {
   return post<T>({
     url: '/search-test',
     data: { search, text },
+  })
+}
+
+export function fetchUpdateKnowledgeGraph<T = any>(knowledgeGraph: KnowledgeGraphConfig) {
+  return post<T>({
+    url: '/setting-knowledge-graph',
+    data: knowledgeGraph,
+  })
+}
+
+export function fetchTestKnowledgeGraph<T = any>(text: string, knowledgeGraph: KnowledgeGraphConfig) {
+  return post<T>({
+    url: '/knowledge-graph-test',
+    data: { knowledgeGraph, text },
   })
 }
 

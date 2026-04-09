@@ -98,6 +98,9 @@ router.get('/chat-history', auth, async (req, res) => {
           searchQuery: c.searchQuery,
           searchResults: c.searchResults,
           searchUsageTime: c.searchUsageTime,
+          knowledgeGraphQuery: c.knowledgeGraphQuery,
+          knowledgeGraphResults: c.knowledgeGraphResults,
+          knowledgeGraphUsageTime: c.knowledgeGraphUsageTime,
           reasoning: c.reasoning,
           text: c.response,
           inversion: false,
@@ -323,6 +326,9 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
           if (chunk.searching !== undefined) {
             sendSSEData('searching', { searching: chunk.searching })
           }
+          if (chunk.knowledgeGraphSearching !== undefined) {
+            sendSSEData('knowledge_graph_searching', { knowledgeGraphSearching: chunk.knowledgeGraphSearching })
+          }
           if (chunk.generating !== undefined) {
             sendSSEData('generating', { generating: chunk.generating })
           }
@@ -333,6 +339,15 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
             sendSSEData('search_results', {
               searchResults: chunk.searchResults,
               searchUsageTime: chunk.searchUsageTime,
+            })
+          }
+          if (chunk.knowledgeGraphQuery) {
+            sendSSEData('knowledge_graph_query', { knowledgeGraphQuery: chunk.knowledgeGraphQuery })
+          }
+          if (chunk.knowledgeGraphResults) {
+            sendSSEData('knowledge_graph_results', {
+              knowledgeGraphResults: chunk.knowledgeGraphResults,
+              knowledgeGraphUsageTime: chunk.knowledgeGraphUsageTime,
             })
           }
           if (chunk.delta) {

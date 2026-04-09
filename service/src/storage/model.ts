@@ -84,9 +84,10 @@ export class ChatRoom {
   status: Status = Status.Normal
   chatModel: string
   searchEnabled: boolean
+  knowledgeGraphEnabled?: boolean
   toolsEnabled?: boolean
   imageUploadEnabled?: boolean
-  constructor(userId: string, title: string, roomId: number, chatModel: string, usingContext: boolean, maxContextCount: number, searchEnabled: boolean, toolsEnabled?: boolean, imageUploadEnabled?: boolean) {
+  constructor(userId: string, title: string, roomId: number, chatModel: string, usingContext: boolean, maxContextCount: number, searchEnabled: boolean, knowledgeGraphEnabled?: boolean, toolsEnabled?: boolean, imageUploadEnabled?: boolean) {
     this.userId = userId
     this.title = title
     this.prompt = undefined
@@ -95,6 +96,7 @@ export class ChatRoom {
     this.maxContextCount = maxContextCount
     this.chatModel = chatModel
     this.searchEnabled = searchEnabled
+    this.knowledgeGraphEnabled = knowledgeGraphEnabled
     this.toolsEnabled = toolsEnabled
     this.imageUploadEnabled = imageUploadEnabled
   }
@@ -136,6 +138,9 @@ export class ChatInfo {
   searchQuery?: string
   searchResults?: SearchResult[]
   searchUsageTime?: number
+  knowledgeGraphQuery?: string
+  knowledgeGraphResults?: SearchResult[]
+  knowledgeGraphUsageTime?: number
   reasoning?: string
   response?: string
   status: Status = Status.Normal
@@ -223,6 +228,35 @@ export class SearchServiceOptions {
   public includeRawContent?: boolean
 }
 
+export class KnowledgeGraphConfig {
+  public enabled: boolean
+  public options?: KnowledgeGraphOptions
+}
+
+export enum KnowledgeGraphQueryMode {
+  Local = 'local',
+  Global = 'global',
+  Hybrid = 'hybrid',
+  Naive = 'naive',
+  Mix = 'mix',
+}
+
+export class KnowledgeGraphOptions {
+  public repoDir?: string
+  public pythonPath?: string
+  public workingDir?: string
+  public workspace?: string
+  public queryMode?: KnowledgeGraphQueryMode
+  public maxResults?: number
+  public topK?: number
+  public chunkTopK?: number
+  public maxEntityTokens?: number
+  public maxRelationTokens?: number
+  public maxTotalTokens?: number
+  public timeoutMs?: number
+  public enableRerank?: boolean
+}
+
 export class Config {
   constructor(
     public _id: ObjectId,
@@ -240,6 +274,7 @@ export class Config {
     public auditConfig?: AuditConfig,
     public searchConfig?: SearchConfig,
     public announceConfig?: AnnounceConfig,
+    public knowledgeGraphConfig?: KnowledgeGraphConfig,
   ) { }
 }
 

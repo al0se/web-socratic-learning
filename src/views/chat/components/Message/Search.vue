@@ -7,6 +7,7 @@ const props = defineProps<Props>()
 const { t } = useI18n()
 
 interface Props {
+  variant?: 'search' | 'knowledgeGraph'
   searchQuery?: string
   searchResults?: Chat.SearchResult[]
   searchUsageTime?: number
@@ -27,8 +28,8 @@ const searchBtnTitle = computed(() => {
 
 const searchHeadingText = computed(() => {
   if (props.searchQuery)
-    return `${t('chat.searchQuery')}: ${props.searchQuery}`
-  return t('chat.searching')
+    return `${props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphQuery') : t('chat.searchQuery')}: ${props.searchQuery}`
+  return props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphSearching') : t('chat.searching')
 })
 
 const shouldShowSearchingIndicator = computed(() => {
@@ -92,13 +93,13 @@ function toggleCollapse() {
       <div class="flex items-center pr-2">
         <template v-if="shouldShowSearchingIndicator">
           <Spinner class="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
-          <span class="text-blue-700 dark:text-blue-200 truncate">{{ t('chat.searching') }}</span>
+          <span class="text-blue-700 dark:text-blue-200 truncate">{{ props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphSearching') : t('chat.searching') }}</span>
           <span class="ml-1.5 mr-5 text-blue-400 dark:text-blue-500">|</span>
         </template>
         <span class="text-blue-800 dark:text-blue-100 truncate">{{ searchHeadingText }}</span>
         <template v-if="searchUsageTime">
           <span class="mr-1.5 ml-5 text-blue-400 dark:text-blue-500">|</span>
-          <span class="text-blue-600 dark:text-blue-300 truncate">{{ `${t('chat.searchUsageTime')}: ${searchUsageTime.toFixed(2)}s` }}</span>
+          <span class="text-blue-600 dark:text-blue-300 truncate">{{ `${props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphUsageTime') : t('chat.searchUsageTime')}: ${searchUsageTime.toFixed(2)}s` }}</span>
         </template>
       </div>
       <button
@@ -139,6 +140,7 @@ function toggleCollapse() {
           >
             <div class="flex items-start justify-between mb-1">
               <a
+                v-if="result.url"
                 :href="result.url"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -146,6 +148,12 @@ function toggleCollapse() {
               >
                 {{ result.title }}
               </a>
+              <span
+                v-else
+                class="text-blue-700 dark:text-red-200 text-sm font-medium leading-tight block pr-2"
+              >
+                {{ result.title }}
+              </span>
             </div>
             <p class="text-xs text-gray-700 dark:text-gray-300 leading-relaxed mb-1">
               {{ result.content }}

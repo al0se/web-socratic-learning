@@ -11,6 +11,7 @@ export class ConfigState {
   mailConfig?: MailConfig
   auditConfig?: AuditConfig
   searchConfig?: SearchConfig
+  knowledgeGraphConfig?: KnowledgeGraphConfig
   announceConfig?: AnnounceConfig
   toolsEnabled?: boolean
 }
@@ -216,5 +217,50 @@ export class SearchConfig {
     if (!this.options.maxResults) {
       this.options.maxResults = 10
     }
+  }
+}
+
+export type KnowledgeGraphQueryMode = 'local' | 'global' | 'hybrid' | 'naive' | 'mix'
+
+export interface KnowledgeGraphOptions {
+  repoDir?: string
+  pythonPath?: string
+  workingDir?: string
+  workspace?: string
+  queryMode?: KnowledgeGraphQueryMode
+  maxResults?: number
+  topK?: number
+  chunkTopK?: number
+  maxEntityTokens?: number
+  maxRelationTokens?: number
+  maxTotalTokens?: number
+  timeoutMs?: number
+  enableRerank?: boolean
+}
+
+export class KnowledgeGraphConfig {
+  enabled: boolean
+  options: KnowledgeGraphOptions
+  constructor(enabled: boolean, options: KnowledgeGraphOptions) {
+    this.enabled = enabled
+    this.options = options
+    if (!this.options.queryMode)
+      this.options.queryMode = 'mix'
+    if (!this.options.maxResults)
+      this.options.maxResults = 10
+    if (!this.options.topK)
+      this.options.topK = 10
+    if (!this.options.chunkTopK)
+      this.options.chunkTopK = 10
+    if (!this.options.maxEntityTokens)
+      this.options.maxEntityTokens = 6000
+    if (!this.options.maxRelationTokens)
+      this.options.maxRelationTokens = 8000
+    if (!this.options.maxTotalTokens)
+      this.options.maxTotalTokens = 30000
+    if (!this.options.timeoutMs)
+      this.options.timeoutMs = 120000
+    if (this.options.enableRerank === undefined)
+      this.options.enableRerank = true
   }
 }

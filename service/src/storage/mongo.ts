@@ -331,6 +331,29 @@ export async function updateChatSearchResult(chatId: string, searchResults: Sear
   return result.modifiedCount > 0
 }
 
+export async function updateChatKnowledgeGraphQuery(chatId: string, knowledgeGraphQuery: string) {
+  const query = { _id: new ObjectId(chatId) }
+  const update = {
+    $set: {
+      knowledgeGraphQuery,
+    },
+  }
+  const result = await chatCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateChatKnowledgeGraphResult(chatId: string, knowledgeGraphResults: SearchResult[], knowledgeGraphUsageTime: number) {
+  const query = { _id: new ObjectId(chatId) }
+  const update = {
+    $set: {
+      knowledgeGraphResults,
+      knowledgeGraphUsageTime,
+    },
+  }
+  const result = await chatCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
 export async function insertChatUsage(userId: ObjectId, roomId: number, chatId: ObjectId, messageId: string, model: string, usage: UsageResponse, imageUsage?: ImageUsageItem[]) {
   const chatUsage = new ChatUsage(userId, roomId, chatId, messageId, model, usage, imageUsage)
   await usageCol.insertOne(chatUsage)
@@ -344,6 +367,7 @@ export async function createChatRoom(
   chatModel: string,
   maxContextCount: number,
   searchEnabled = true,
+  knowledgeGraphEnabled = false,
 ) {
   const config = await getCacheConfig()
   if (!chatModel) {
@@ -352,7 +376,7 @@ export async function createChatRoom(
   if (maxContextCount === undefined) {
     maxContextCount = 20
   }
-  const room = new ChatRoom(userId, title, roomId, chatModel, true, maxContextCount, searchEnabled, false)
+  const room = new ChatRoom(userId, title, roomId, chatModel, true, maxContextCount, searchEnabled, knowledgeGraphEnabled, false)
   room.prompt = DEFAULT_ROOM_PROMPT
   // After room creation, set imageUploadEnabled based on chatModel.
   // Initialize as false here; the room-create API will set it dynamically.
@@ -416,6 +440,17 @@ export async function updateRoomSearchEnabled(userId: string, roomId: number, se
   const update = {
     $set: {
       searchEnabled,
+    },
+  }
+  const result = await roomCol.updateOne(query, update)
+  return result.modifiedCount > 0
+}
+
+export async function updateRoomKnowledgeGraphEnabled(userId: string, roomId: number, knowledgeGraphEnabled: boolean) {
+  const query = { userId, roomId }
+  const update = {
+    $set: {
+      knowledgeGraphEnabled,
     },
   }
   const result = await roomCol.updateOne(query, update)

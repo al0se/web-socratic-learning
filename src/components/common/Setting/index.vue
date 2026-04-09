@@ -8,6 +8,7 @@ import Audit from './Audit.vue'
 import General from './General.vue'
 import Gift from './Gift.vue'
 import Key from './Keys.vue'
+import KnowledgeGraph from './KnowledgeGraph.vue'
 import Mail from './Mail.vue'
 import Password from './Password.vue'
 import Search from './Search.vue'
@@ -167,6 +168,13 @@ const show = computed({
           <span class="ml-2">{{ t('setting.searchConfig') }}</span>
         </template>
         <Search />
+      </NTabPane>
+      <NTabPane v-if="userStore.userInfo.root" name="KnowledgeGraphConfig" tab="KnowledgeGraphConfig">
+        <template #tab>
+          <IconRiShareForwardBoxLine class="text-lg" />
+          <span class="ml-2">{{ t('setting.knowledgeGraphConfig') }}</span>
+        </template>
+        <KnowledgeGraph />
       </NTabPane>
       <NTabPane v-if="userStore.userInfo.root" name="UserConfig" tab="UserConfig">
         <template #tab>

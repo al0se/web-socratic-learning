@@ -21,9 +21,13 @@ interface Props {
   dateTime?: string
   model?: string
   searching?: boolean
+  knowledgeGraphSearching?: boolean
   searchQuery?: string
   searchResults?: Chat.SearchResult[]
   searchUsageTime?: number
+  knowledgeGraphQuery?: string
+  knowledgeGraphResults?: Chat.SearchResult[]
+  knowledgeGraphUsageTime?: number
   reasoning?: string
   text?: string
   images?: string[]
@@ -232,6 +236,15 @@ function isEventTargetValid(event: any) {
         :search-results="searchResults"
         :search-usage-time="searchUsageTime"
         :search-end="!!searchResults || !!reasoning || !!text"
+        :loading="loading"
+      />
+      <Search
+        v-if="knowledgeGraphSearching || knowledgeGraphQuery"
+        variant="knowledgeGraph"
+        :search-query="knowledgeGraphQuery"
+        :search-results="knowledgeGraphResults"
+        :search-usage-time="knowledgeGraphUsageTime"
+        :search-end="!!knowledgeGraphResults || !!reasoning || !!text"
         :loading="loading"
       />
       <Reasoning

@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken'
 import { ObjectId } from 'mongodb'
 import speakeasy from 'speakeasy'
 import { chatConfig, containsSensitiveWords, initAuditService } from './chatgpt'
+import { normalizeKnowledgeGraphQuery, runKnowledgeGraphQuery } from './lightrag'
 import { auth, getUserId } from './middleware/auth'
 import { authLimiter } from './middleware/limiter'
 import { isAdmin, rootAuth } from './middleware/rootAuth'
@@ -945,6 +946,21 @@ router.post('/setting-search', rootAuth, async (req, res) => {
   }
 })
 
+router.post('/setting-knowledge-graph', rootAuth, async (req, res) => {
+  try {
+    const config = req.body as import('./storage/model').KnowledgeGraphConfig
+
+    const thisConfig = await getOriginConfig()
+    thisConfig.knowledgeGraphConfig = config
+    const result = await updateConfig(thisConfig)
+    clearConfigCache()
+    res.send({ status: 'Success', message: '鎿嶄綔鎴愬姛 | Successfully', data: result.knowledgeGraphConfig })
+  }
+  catch (error) {
+    res.send({ status: 'Fail', message: error.message, data: null })
+  }
+})
+
 router.post('/search-test', rootAuth, async (req, res) => {
   try {
     const { search, text } = req.body as { search: import('./storage/model').SearchConfig, text: string }
@@ -1007,6 +1023,42 @@ router.post('/search-test', rootAuth, async (req, res) => {
   catch (error: any) {
     console.error('Search test error:', error)
     res.send({ status: 'Fail', message: `搜索测试失败 | Search test failed: ${error.message}`, data: null })
+  }
+})
+
+router.post('/knowledge-graph-test', rootAuth, async (req, res) => {
+  try {
+    const { knowledgeGraph, text } = req.body as { knowledgeGraph: import('./storage/model').KnowledgeGraphConfig, text: string }
+
+    if (!knowledgeGraph.enabled) {
+      res.send({ status: 'Fail', message: '鐭ヨ瘑鍥捐氨鏌ヨ鏈惎鐢?| Knowledge graph query is not enabled', data: null })
+      return
+    }
+
+    const normalizedQuery = normalizeKnowledgeGraphQuery(text || '')
+
+    if (!normalizedQuery) {
+      res.send({ status: 'Fail', message: '鏌ヨ鏂囨湰涓嶈兘涓虹┖ | Query text cannot be empty', data: null })
+      return
+    }
+
+    const output = await runKnowledgeGraphQuery(normalizedQuery, knowledgeGraph)
+
+    res.send({
+      status: 'Success',
+      message: `鐭ヨ瘑鍥捐氨娴嬭瘯鎴愬姛 | Knowledge graph test successful (鐢ㄦ椂 ${output.usageTime.toFixed(2)}s, 鎵惧埌 ${output.results.length} 涓粨鏋?`,
+      data: {
+        query: normalizedQuery,
+        prompt: output.prompt,
+        results: output.results,
+        usageTime: output.usageTime,
+        resultCount: output.results.length,
+      },
+    })
+  }
+  catch (error: any) {
+    console.error('Knowledge graph test error:', error)
+    res.send({ status: 'Fail', message: `鐭ヨ瘑鍥捐氨娴嬭瘯澶辫触 | Knowledge graph test failed: ${error.message}`, data: null })
   }
 })
 

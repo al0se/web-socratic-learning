@@ -15,10 +15,14 @@ export interface ChatMessage {
 export interface ResponseChunk {
   id?: string
   searching?: boolean
+  knowledgeGraphSearching?: boolean
   generating?: boolean
   searchQuery?: string
   searchResults?: SearchResult[]
   searchUsageTime?: number
+  knowledgeGraphQuery?: string
+  knowledgeGraphResults?: SearchResult[]
+  knowledgeGraphUsageTime?: number
   text?: string
   reasoning?: string
   role?: string

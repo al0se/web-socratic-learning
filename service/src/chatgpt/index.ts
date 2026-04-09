@@ -7,9 +7,10 @@ import { tavily } from '@tavily/core'
 import dayjs from 'dayjs'
 import OpenAI from 'openai'
 import * as undici from 'undici'
+import { normalizeKnowledgeGraphQuery, runKnowledgeGraphQuery } from '../lightrag'
 import { getCacheApiKeys, getCacheConfig, getOriginConfig } from '../storage/config'
 import { Status, UsageResponse } from '../storage/model'
-import { getChatByMessageId, updateChatSearchQuery, updateChatSearchResult } from '../storage/mongo'
+import { getChatByMessageId, updateChatKnowledgeGraphQuery, updateChatKnowledgeGraphResult, updateChatSearchQuery, updateChatSearchResult } from '../storage/mongo'
 import { DEFAULT_ROOM_PROMPT, sendResponse } from '../utils'
 import { convertImageUrl, saveBase64ToFile } from '../utils/image'
 import { hasAnyRole, isNotEmptyString } from '../utils/is'
@@ -17,6 +18,7 @@ import { textAuditServices } from '../utils/textAudit'
 
 const DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE = 'Current time: {current_time}. Decide whether web search is needed for the user request. If web search is needed, return exactly one query wrapped in <search_query>...</search_query>. If web search is not needed, return <search_query></search_query>. Do not answer the user. Do not output any other text. Keep the query under 300 characters.'
 const DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE = 'Current time: {current_time}. Web search results are provided in the conversation. Use them as the primary source for recent or time-sensitive facts. If the provided search results are sufficient, do not say that you cannot access real-time information. If the results are insufficient or conflicting, say what is missing or uncertain. Respond in the same language as the user.'
+const DEFAULT_KNOWLEDGE_GRAPH_RESULT_SYSTEM_MESSAGE = 'Current time: {current_time}. A LightRAG prompt generated from the local teaching-material knowledge base is provided below. Follow its retrieval grounding, scope, and citation rules when it is relevant to the current request. If it is not relevant, keep following the existing instructions.'
 
 function renderSystemMessage(template: string | undefined, currentTime: string, fallbackTemplate = ''): string {
   const finalTemplate = isNotEmptyString(template) ? template : fallbackTemplate
@@ -27,6 +29,74 @@ function combineInstructions(baseInstruction: string, extraInstruction: string):
   if (!isNotEmptyString(extraInstruction))
     return baseInstruction
   return `${baseInstruction}\n\n${extraInstruction}`
+}
+
+async function getTaggedAuxiliaryQuery(
+  openai: OpenAI,
+  key: KeyConfig,
+  model: string,
+  messages: Array<OpenAI.Chat.ChatCompletionMessageParam | OpenAI.Responses.ResponseInputItem>,
+  instruction: string,
+  tagName: string,
+): Promise<string> {
+  let output = ''
+
+  if (key.keyModel === 'ResponsesAPI') {
+    const retrievalModel = model.startsWith('gpt-5') ? 'gpt-5-nano' : model
+    const response = await openai.responses.create({
+      model: retrievalModel,
+      instructions: instruction,
+      input: messages as OpenAI.Responses.ResponseInput,
+      reasoning: {
+        effort: 'minimal',
+      },
+      store: false,
+    })
+    output = response.output_text
+  }
+  else {
+    const promptMessages = (messages as OpenAI.Chat.ChatCompletionMessageParam[]).map((message, index) => {
+      if (index !== 0)
+        return message
+      return {
+        ...message,
+        content: instruction,
+      }
+    })
+
+    const body: OpenAI.ChatCompletionCreateParamsNonStreaming = {
+      model,
+      messages: promptMessages,
+    }
+    if (key.keyModel === 'VLLM') {
+      // @ts-expect-error vLLM supports a set of parameters that are not part of the OpenAI API.
+      body.chat_template_kwargs = {
+        enable_thinking: false,
+      }
+    }
+    else if (key.keyModel === 'FastDeploy') {
+      body.metadata = {
+        // @ts-expect-error FastDeploy supports a set of parameters that are not part of the OpenAI API.
+        enable_thinking: false,
+      }
+    }
+
+    const completion = await openai.chat.completions.create(body)
+    output = completion.choices[0].message.content as string
+  }
+
+  const match = output.match(new RegExp(`<${tagName}>([\\s\\S]*)<\\/${tagName}>`, 'i'))
+  if (!match)
+    return ''
+
+  return match[1].trim()
+}
+
+function normalizeAuxiliaryQuery(query: string, maxLength = 300): string {
+  let normalized = query.replace(/\s+/g, ' ').trim()
+  if (normalized.length > maxLength)
+    normalized = normalized.slice(0, maxLength).trim()
+  return normalized
 }
 
 /**
@@ -178,65 +248,30 @@ async function chatReplyProcess(options: RequestOptions) {
       } as OpenAI.Chat.ChatCompletionMessageParam)
     }
 
+    const retrievalMessages = [...messages]
     let hasSearchResult = false
+    let hasKnowledgeGraphResult = false
     const searchConfig = globalConfig.searchConfig
+    const knowledgeGraphConfig = globalConfig.knowledgeGraphConfig
+    const knowledgeGraphEnabled = !!options.room.knowledgeGraphEnabled
+    const currentTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
     if (searchConfig.enabled && searchConfig?.options?.apiKey && searchEnabled) {
       // Send searching status before starting to fetch search query
       process?.({
         searching: true,
       })
       try {
-        const currentTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
         const systemMessageGetSearchQuery = renderSystemMessage(searchConfig.systemMessageGetSearchQuery, currentTime, DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE)
-
-        // Use Responses API or Chat Completions to get search query
-        let searchQuery: string = ''
-        if (key.keyModel === 'ResponsesAPI') {
-          const modelGetSearchQuery = model.startsWith('gpt-5') ? 'gpt-5-nano' : model
-          const response = await openai.responses.create({
-            model: modelGetSearchQuery,
-            instructions: systemMessageGetSearchQuery,
-            input: messages as OpenAI.Responses.ResponseInput,
-            reasoning: {
-              effort: 'minimal',
-            },
-            store: false,
-          })
-          searchQuery = response.output_text
-        }
-        else {
-          (messages as OpenAI.Chat.ChatCompletionMessageParam[])[0].content = systemMessageGetSearchQuery
-          const getSearchQueryChatCompletionCreateBody: OpenAI.ChatCompletionCreateParamsNonStreaming = {
-            model,
-            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-          }
-          if (key.keyModel === 'VLLM') {
-            // @ts-expect-error vLLM supports a set of parameters that are not part of the OpenAI API.
-            getSearchQueryChatCompletionCreateBody.chat_template_kwargs = {
-              enable_thinking: false,
-            }
-          }
-          else if (key.keyModel === 'FastDeploy') {
-            getSearchQueryChatCompletionCreateBody.metadata = {
-              // @ts-expect-error FastDeploy supports a set of parameters that are not part of the OpenAI API.
-              enable_thinking: false,
-            }
-          }
-          const completion = await openai.chat.completions.create(getSearchQueryChatCompletionCreateBody)
-          searchQuery = completion.choices[0].message.content as string
-        }
-        const match = searchQuery.match(/<search_query>([\s\S]*)<\/search_query>/i)
-        if (match)
-          searchQuery = match[1].trim()
-        else
-          searchQuery = ''
-
-        // Enforce query length to satisfy Tavily limits.
-        // Error: Query is too long. Max query length is 400 characters.
-        const maxSearchQueryLength = 300
-        searchQuery = searchQuery.replace(/\s+/g, ' ').trim()
-        if (searchQuery.length > maxSearchQueryLength)
-          searchQuery = searchQuery.slice(0, maxSearchQueryLength).trim()
+        let searchQuery = await getTaggedAuxiliaryQuery(
+          openai,
+          key,
+          model,
+          retrievalMessages,
+          systemMessageGetSearchQuery,
+          'search_query',
+        )
+        searchQuery = normalizeAuxiliaryQuery(searchQuery)
 
         if (searchQuery) {
           await updateChatSearchQuery(messageId, searchQuery)
@@ -284,10 +319,7 @@ search result: <search_result>${searchResultContent}</search_result>`,
           })
 
           const searchResultInstruction = renderSystemMessage(searchConfig.systemMessageWithSearchResult, currentTime, DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE)
-          instructions = combineInstructions(systemMessage, searchResultInstruction)
-          if (key.keyModel !== 'ResponsesAPI') {
-            (messages as OpenAI.Chat.ChatCompletionMessageParam[])[0].content = instructions
-          }
+          instructions = combineInstructions(instructions, searchResultInstruction)
           hasSearchResult = true
         }
         else {
@@ -306,8 +338,49 @@ search result: <search_result>${searchResultContent}</search_result>`,
       }
     }
 
-    if (!hasSearchResult && key.keyModel !== 'ResponsesAPI')
-      (messages as OpenAI.Chat.ChatCompletionMessageParam[])[0].content = systemMessage
+    if (knowledgeGraphConfig?.enabled && knowledgeGraphEnabled) {
+      process?.({
+        knowledgeGraphSearching: true,
+      })
+      try {
+        const knowledgeGraphQuery = normalizeKnowledgeGraphQuery(message)
+
+        if (knowledgeGraphQuery) {
+          await updateChatKnowledgeGraphQuery(messageId, knowledgeGraphQuery)
+
+          process?.({
+            knowledgeGraphQuery,
+          })
+
+          const knowledgeGraphOutput = await runKnowledgeGraphQuery(knowledgeGraphQuery, knowledgeGraphConfig)
+
+          await updateChatKnowledgeGraphResult(messageId, knowledgeGraphOutput.results, knowledgeGraphOutput.usageTime)
+
+          process?.({
+            knowledgeGraphResults: knowledgeGraphOutput.results,
+            knowledgeGraphUsageTime: knowledgeGraphOutput.usageTime,
+          })
+
+          const knowledgeGraphInstruction = renderSystemMessage(DEFAULT_KNOWLEDGE_GRAPH_RESULT_SYSTEM_MESSAGE, currentTime)
+          instructions = combineInstructions(instructions, `${knowledgeGraphInstruction}\n\n${knowledgeGraphOutput.prompt}`)
+          hasKnowledgeGraphResult = true
+        }
+        else {
+          process?.({
+            knowledgeGraphSearching: false,
+          })
+        }
+      }
+      catch (error) {
+        globalThis.console.error('knowledge graph query error, ', error)
+        process?.({
+          knowledgeGraphSearching: false,
+        })
+      }
+    }
+
+    if (key.keyModel !== 'ResponsesAPI')
+      (messages as OpenAI.Chat.ChatCompletionMessageParam[])[0].content = hasSearchResult || hasKnowledgeGraphResult ? instructions : systemMessage
 
     // Send generating status before starting to generate response
     process?.({

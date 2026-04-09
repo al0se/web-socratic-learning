@@ -8,7 +8,7 @@ declare namespace Chat {
 
   interface SearchResult {
     title: string
-    url: string
+    url?: string
     content: string
   }
 
@@ -16,9 +16,13 @@ declare namespace Chat {
     uuid?: number
     dateTime: string
     searching?: boolean
+    knowledgeGraphSearching?: boolean
     searchQuery?: string
     searchResults?: SearchResult[]
     searchUsageTime?: number
+    knowledgeGraphQuery?: string
+    knowledgeGraphResults?: SearchResult[]
+    knowledgeGraphUsageTime?: number
     reasoning?: string
     finish_reason?: string
     text: string
@@ -51,6 +55,7 @@ declare namespace Chat {
     maxContextCount: number
     chatModel: string
     searchEnabled: boolean
+    knowledgeGraphEnabled?: boolean
     toolsEnabled?: boolean
     imageUploadEnabled?: boolean
   }

@@ -2,11 +2,14 @@ import type { TextAuditServiceProvider } from 'src/utils/textAudit'
 import * as process from 'node:process'
 import { ObjectId } from 'mongodb'
 import { isNotEmptyString, isTextAuditServiceProvider } from '../utils/is'
-import { AnnounceConfig, AuditConfig, Config, KeyConfig, MailConfig, SearchConfig, SearchServiceProvider, SiteConfig, TextAudioType, UserRole } from './model'
+import { AnnounceConfig, AuditConfig, Config, KeyConfig, KnowledgeGraphConfig, KnowledgeGraphQueryMode, MailConfig, SearchConfig, SearchServiceProvider, SiteConfig, TextAudioType, UserRole } from './model'
 import { getConfig, getKeys, upsertKey } from './mongo'
 
 const DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE = 'Current time: {current_time}. Decide whether web search is needed for the user request. If web search is needed, return exactly one query wrapped in <search_query>...</search_query>. If web search is not needed, return <search_query></search_query>. Do not answer the user. Do not output any other text. Keep the query under 300 characters.'
 const DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE = 'Current time: {current_time}. Web search results are provided in the conversation. Use them as the primary source for recent or time-sensitive facts. If the provided search results are sufficient, do not say that you cannot access real-time information. If the results are insufficient or conflicting, say what is missing or uncertain. Respond in the same language as the user.'
+const DEFAULT_KNOWLEDGE_GRAPH_REPO_DIR = 'D:\\learn-agent\\LightRAG'
+const DEFAULT_KNOWLEDGE_GRAPH_PYTHON_PATH = 'D:\\learn-agent\\LightRAG\\.venv\\Scripts\\python.exe'
+const DEFAULT_KNOWLEDGE_GRAPH_WORKING_DIR = 'D:\\learn-agent\\data\\lesson_kb'
 
 let cachedConfig: Config | undefined
 let cacheExpiration = 0
@@ -95,6 +98,69 @@ export async function getOriginConfig() {
     config.searchConfig.systemMessageGetSearchQuery = DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE
   if (!isNotEmptyString(config.searchConfig.systemMessageWithSearchResult))
     config.searchConfig.systemMessageWithSearchResult = DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE
+
+  if (!config.knowledgeGraphConfig) {
+    config.knowledgeGraphConfig = new KnowledgeGraphConfig()
+    config.knowledgeGraphConfig.enabled = false
+    config.knowledgeGraphConfig.options = {
+      repoDir: DEFAULT_KNOWLEDGE_GRAPH_REPO_DIR,
+      pythonPath: DEFAULT_KNOWLEDGE_GRAPH_PYTHON_PATH,
+      workingDir: DEFAULT_KNOWLEDGE_GRAPH_WORKING_DIR,
+      workspace: '',
+      queryMode: KnowledgeGraphQueryMode.Mix,
+      maxResults: 10,
+      topK: 10,
+      chunkTopK: 10,
+      maxEntityTokens: 6000,
+      maxRelationTokens: 8000,
+      maxTotalTokens: 30000,
+      timeoutMs: 120000,
+      enableRerank: true,
+    }
+  }
+  if (!config.knowledgeGraphConfig.options) {
+    config.knowledgeGraphConfig.options = {
+      repoDir: DEFAULT_KNOWLEDGE_GRAPH_REPO_DIR,
+      pythonPath: DEFAULT_KNOWLEDGE_GRAPH_PYTHON_PATH,
+      workingDir: DEFAULT_KNOWLEDGE_GRAPH_WORKING_DIR,
+      workspace: '',
+      queryMode: KnowledgeGraphQueryMode.Mix,
+      maxResults: 10,
+      topK: 10,
+      chunkTopK: 10,
+      maxEntityTokens: 6000,
+      maxRelationTokens: 8000,
+      maxTotalTokens: 30000,
+      timeoutMs: 120000,
+      enableRerank: true,
+    }
+  }
+  if (!isNotEmptyString(config.knowledgeGraphConfig.options.repoDir))
+    config.knowledgeGraphConfig.options.repoDir = DEFAULT_KNOWLEDGE_GRAPH_REPO_DIR
+  if (!isNotEmptyString(config.knowledgeGraphConfig.options.pythonPath))
+    config.knowledgeGraphConfig.options.pythonPath = DEFAULT_KNOWLEDGE_GRAPH_PYTHON_PATH
+  if (!isNotEmptyString(config.knowledgeGraphConfig.options.workingDir))
+    config.knowledgeGraphConfig.options.workingDir = DEFAULT_KNOWLEDGE_GRAPH_WORKING_DIR
+  if (config.knowledgeGraphConfig.options.workspace === undefined)
+    config.knowledgeGraphConfig.options.workspace = ''
+  if (!isNotEmptyString(config.knowledgeGraphConfig.options.queryMode))
+    config.knowledgeGraphConfig.options.queryMode = KnowledgeGraphQueryMode.Mix
+  if (!config.knowledgeGraphConfig.options.maxResults)
+    config.knowledgeGraphConfig.options.maxResults = 10
+  if (!config.knowledgeGraphConfig.options.topK)
+    config.knowledgeGraphConfig.options.topK = 10
+  if (!config.knowledgeGraphConfig.options.chunkTopK)
+    config.knowledgeGraphConfig.options.chunkTopK = 10
+  if (!config.knowledgeGraphConfig.options.maxEntityTokens)
+    config.knowledgeGraphConfig.options.maxEntityTokens = 6000
+  if (!config.knowledgeGraphConfig.options.maxRelationTokens)
+    config.knowledgeGraphConfig.options.maxRelationTokens = 8000
+  if (!config.knowledgeGraphConfig.options.maxTotalTokens)
+    config.knowledgeGraphConfig.options.maxTotalTokens = 30000
+  if (!config.knowledgeGraphConfig.options.timeoutMs)
+    config.knowledgeGraphConfig.options.timeoutMs = 120000
+  if (config.knowledgeGraphConfig.options.enableRerank === undefined)
+    config.knowledgeGraphConfig.options.enableRerank = true
 
   if (!isNotEmptyString(config.siteConfig.chatModels))
     config.siteConfig.chatModels = 'gpt-5.2,gpt-5-mini,gpt-5-nano'

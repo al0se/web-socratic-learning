@@ -267,9 +267,13 @@ async function onConversation() {
     let accumulatedReasoning = ''
     const fetchChatAPIOnce = async () => {
       let searching: boolean | undefined
+      let knowledgeGraphSearching: boolean | undefined
       let searchQuery: string
       let searchResults: Chat.SearchResult[]
       let searchUsageTime: number
+      let knowledgeGraphQuery: string
+      let knowledgeGraphResults: Chat.SearchResult[]
+      let knowledgeGraphUsageTime: number
 
       await fetchChatAPIProcessSSE({
         roomId: currentChatRoom.value!.roomId,
@@ -291,6 +295,16 @@ async function onConversation() {
             },
           )
         },
+        onKnowledgeGraphSearching: (data) => {
+          knowledgeGraphSearching = data.knowledgeGraphSearching
+          chatStore.updateChatMessage(
+            currentChatRoom.value!.roomId,
+            dataSources.value.length - 1,
+            {
+              knowledgeGraphSearching: data.knowledgeGraphSearching,
+            },
+          )
+        },
         onGenerating: (data) => {
           chatStore.updateChatMessage(
             currentChatRoom.value!.roomId,
@@ -307,6 +321,14 @@ async function onConversation() {
         onSearchResults: (data) => {
           searchResults = data.searchResults
           searchUsageTime = data.searchUsageTime
+        },
+        onKnowledgeGraphQuery: (data) => {
+          knowledgeGraphQuery = data.knowledgeGraphQuery
+          knowledgeGraphSearching = false
+        },
+        onKnowledgeGraphResults: (data) => {
+          knowledgeGraphResults = data.knowledgeGraphResults
+          knowledgeGraphUsageTime = data.knowledgeGraphUsageTime
         },
         onToolCalls: async (data) => {
           // Handle tool calls (e.g., image generation results)
@@ -357,9 +379,13 @@ async function onConversation() {
             {
               dateTime: new Date().toLocaleString(),
               searching,
+              knowledgeGraphSearching,
               searchQuery,
               searchResults,
               searchUsageTime,
+              knowledgeGraphQuery,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
               reasoning: accumulatedReasoning,
               text: lastText,
               inversion: false,
@@ -382,6 +408,14 @@ async function onConversation() {
             searchResults = data.searchResults
           if (data.searchUsageTime)
             searchUsageTime = data.searchUsageTime
+          if (data.knowledgeGraphQuery) {
+            knowledgeGraphQuery = data.knowledgeGraphQuery
+            knowledgeGraphSearching = false
+          }
+          if (data.knowledgeGraphResults)
+            knowledgeGraphResults = data.knowledgeGraphResults
+          if (data.knowledgeGraphUsageTime)
+            knowledgeGraphUsageTime = data.knowledgeGraphUsageTime
 
           const usage = (data.detail && data.detail.usage)
             ? {
@@ -398,9 +432,13 @@ async function onConversation() {
             {
               dateTime: new Date().toLocaleString(),
               searching,
+              knowledgeGraphSearching,
               searchQuery,
               searchResults,
               searchUsageTime,
+              knowledgeGraphQuery,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
               reasoning: data?.reasoning,
               text: data.text ?? '',
               inversion: false,
@@ -454,9 +492,13 @@ async function onConversation() {
             {
               dateTime: new Date().toLocaleString(),
               searching: false,
+              knowledgeGraphSearching: false,
               searchQuery,
               searchResults,
               searchUsageTime,
+              knowledgeGraphQuery,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
               reasoning: data?.reasoning || accumulatedReasoning,
               text: data?.text || lastText,
               inversion: false,
@@ -587,9 +629,13 @@ async function onRegenerate(index: number) {
     let accumulatedReasoning = ''
     const fetchChatAPIOnce = async () => {
       let searching: boolean | undefined
+      let knowledgeGraphSearching: boolean | undefined
       let searchQuery: string
       let searchResults: Chat.SearchResult[]
       let searchUsageTime: number
+      let knowledgeGraphQuery: string
+      let knowledgeGraphResults: Chat.SearchResult[]
+      let knowledgeGraphUsageTime: number
 
       await fetchChatAPIProcessSSE({
         roomId: currentChatRoom.value!.roomId,
@@ -612,6 +658,16 @@ async function onRegenerate(index: number) {
             },
           )
         },
+        onKnowledgeGraphSearching: (data) => {
+          knowledgeGraphSearching = data.knowledgeGraphSearching
+          chatStore.updateChatMessage(
+            currentChatRoom.value!.roomId,
+            dataSources.value.length - 1,
+            {
+              knowledgeGraphSearching: data.knowledgeGraphSearching,
+            },
+          )
+        },
         onGenerating: (data) => {
           updateChatSome(
             currentChatRoom.value!.roomId,
@@ -628,6 +684,14 @@ async function onRegenerate(index: number) {
         onSearchResults: (data) => {
           searchResults = data.searchResults
           searchUsageTime = data.searchUsageTime
+        },
+        onKnowledgeGraphQuery: (data) => {
+          knowledgeGraphQuery = data.knowledgeGraphQuery
+          knowledgeGraphSearching = false
+        },
+        onKnowledgeGraphResults: (data) => {
+          knowledgeGraphResults = data.knowledgeGraphResults
+          knowledgeGraphUsageTime = data.knowledgeGraphUsageTime
         },
         onToolCalls: async (data) => {
           // Handle tool calls (e.g., image generation results)
@@ -679,9 +743,13 @@ async function onRegenerate(index: number) {
             {
               dateTime: new Date().toLocaleString(),
               searching,
+              knowledgeGraphSearching,
               searchQuery,
               searchResults,
               searchUsageTime,
+              knowledgeGraphQuery,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
               reasoning: accumulatedReasoning,
               text: lastText,
               inversion: false,
@@ -705,6 +773,14 @@ async function onRegenerate(index: number) {
             searchResults = data.searchResults
           if (data.searchUsageTime)
             searchUsageTime = data.searchUsageTime
+          if (data.knowledgeGraphQuery) {
+            knowledgeGraphQuery = data.knowledgeGraphQuery
+            knowledgeGraphSearching = false
+          }
+          if (data.knowledgeGraphResults)
+            knowledgeGraphResults = data.knowledgeGraphResults
+          if (data.knowledgeGraphUsageTime)
+            knowledgeGraphUsageTime = data.knowledgeGraphUsageTime
           // Handle complete message data (compatibility mode)
           const usage = (data.detail && data.detail.usage)
             ? {
@@ -720,9 +796,13 @@ async function onRegenerate(index: number) {
             {
               dateTime: new Date().toLocaleString(),
               searching,
+              knowledgeGraphSearching,
               searchQuery,
               searchResults,
               searchUsageTime,
+              knowledgeGraphQuery,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
               reasoning: data?.reasoning,
               finish_reason: data?.finish_reason,
               text: data.text ?? '',
@@ -762,9 +842,13 @@ async function onRegenerate(index: number) {
             {
               dateTime: new Date().toLocaleString(),
               searching: false,
+              knowledgeGraphSearching: false,
               searchQuery,
               searchResults,
               searchUsageTime,
+              knowledgeGraphQuery,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
               reasoning: data?.reasoning || accumulatedReasoning,
               finish_reason: data?.finish_reason,
               text: data?.text || lastText,
@@ -1025,6 +1109,17 @@ async function handleToggleSearchEnabled() {
     ms.success(t('chat.turnOnSearch'))
   else
     ms.warning(t('chat.turnOffSearch'))
+}
+
+async function handleToggleKnowledgeGraphEnabled() {
+  if (!currentChatRoom.value)
+    return
+
+  await chatStore.setChatKnowledgeGraphEnabled(!currentChatRoom.value.knowledgeGraphEnabled)
+  if (currentChatRoom.value.knowledgeGraphEnabled)
+    ms.success(t('chat.turnOnKnowledgeGraph'))
+  else
+    ms.warning(t('chat.turnOffKnowledgeGraph'))
 }
 
 const placeholder = computed(() => {
@@ -1382,9 +1477,13 @@ onUnmounted(() => {
                   :current-nav-index="currentNavIndexRef"
                   :date-time="item.dateTime"
                   :searching="item?.searching"
+                  :knowledge-graph-searching="item?.knowledgeGraphSearching"
                   :search-query="item?.searchQuery"
                   :search-results="item?.searchResults"
                   :search-usage-time="item?.searchUsageTime"
+                  :knowledge-graph-query="item?.knowledgeGraphQuery"
+                  :knowledge-graph-results="item?.knowledgeGraphResults"
+                  :knowledge-graph-usage-time="item?.knowledgeGraphUsageTime"
                   :reasoning="item?.reasoning"
                   :text="item.text"
                   :images="item.images"
@@ -1448,6 +1547,16 @@ onUnmounted(() => {
                 <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.searchEnabled ? t('chat.searchEnabled') : t('chat.searchDisabled') }}</span>
               </span>
             </HoverButton>
+            <HoverButton
+              class="w-full flex justify-center"
+              :class="{ 'text-[#2f9e44]': currentChatRoom?.knowledgeGraphEnabled, 'text-[#c92a2a]': !currentChatRoom?.knowledgeGraphEnabled }"
+              @click="handleToggleKnowledgeGraphEnabled"
+            >
+              <span class="w-full text-[11px] flex items-center justify-center gap-[clamp(0.125rem,0.6vw,0.375rem)] text-center leading-tight">
+                <IconRiShareForwardBoxLine class="text-[12px]" />
+                <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.knowledgeGraphEnabled ? t('chat.knowledgeGraphEnabled') : t('chat.knowledgeGraphDisabled') }}</span>
+              </span>
+            </HoverButton>
           </div>
           <div class="flex items-center" :class="[isMobile ? 'flex-wrap gap-2' : 'space-x-2']">
             <div v-if="currentChatRoom">
@@ -1502,6 +1611,18 @@ onUnmounted(() => {
               <span class="text-sm flex items-center gap-1">
                 <IconMdiWeb class="text-base" />
                 <span class="text-xs font-bold tracking-wide">{{ currentChatRoom?.searchEnabled ? t('chat.searchEnabled') : t('chat.searchDisabled') }}</span>
+              </span>
+            </HoverButton>
+            <HoverButton
+              v-if="!isMobile"
+              :tooltip="currentChatRoom?.knowledgeGraphEnabled ? t('chat.clickTurnOffKnowledgeGraph') : t('chat.clickTurnOnKnowledgeGraph')"
+              :tooltip-help="t('chat.knowledgeGraphHelp')"
+              :class="{ 'text-[#2f9e44]': currentChatRoom?.knowledgeGraphEnabled, 'text-[#c92a2a]': !currentChatRoom?.knowledgeGraphEnabled }"
+              @click="handleToggleKnowledgeGraphEnabled"
+            >
+              <span class="text-sm flex items-center gap-1">
+                <IconRiShareForwardBoxLine class="text-base" />
+                <span class="text-xs font-bold tracking-wide">{{ currentChatRoom?.knowledgeGraphEnabled ? t('chat.knowledgeGraphEnabled') : t('chat.knowledgeGraphDisabled') }}</span>
               </span>
             </HoverButton>
           </div>

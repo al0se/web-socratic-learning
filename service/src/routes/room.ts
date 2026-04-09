@@ -11,6 +11,7 @@ import {
   renameChatRoom,
   updateRoomChatModel,
   updateRoomImageUploadEnabled,
+  updateRoomKnowledgeGraphEnabled,
   updateRoomMaxContextCount,
   updateRoomPrompt,
   updateRoomSearchEnabled,
@@ -37,6 +38,7 @@ router.get('/chatrooms', auth, async (req, res) => {
         maxContextCount: r.maxContextCount === undefined ? 20 : r.maxContextCount,
         chatModel: r.chatModel,
         searchEnabled: !!r.searchEnabled,
+        knowledgeGraphEnabled: !!r.knowledgeGraphEnabled,
         toolsEnabled: !!r.toolsEnabled,
         imageUploadEnabled: !!r.imageUploadEnabled,
       })
@@ -125,6 +127,7 @@ router.post('/room-create', auth, async (req, res) => {
       resolvedChatModel || '',
       user.config?.maxContextCount,
       defaultSearchEnabled,
+      false,
     )
     // Set imageUploadEnabled based on chatModel.
     if (user && room.chatModel) {
@@ -150,6 +153,7 @@ router.post('/room-create', auth, async (req, res) => {
       await updateRoomImageUploadEnabled(userId, roomId, imageUploadEnabled || false)
       await updateRoomToolsEnabled(userId, roomId, toolsEnabled || false)
       room.searchEnabled = defaultSearchEnabled
+      room.knowledgeGraphEnabled = false
       room.imageUploadEnabled = imageUploadEnabled || false
       room.toolsEnabled = toolsEnabled || false
     }
@@ -279,6 +283,22 @@ router.post('/room-search-enabled', auth, async (req, res) => {
     const userId = req.headers.userId as string
     const { searchEnabled, roomId } = req.body as { searchEnabled: boolean, roomId: number }
     const success = await updateRoomSearchEnabled(userId, roomId, searchEnabled)
+    if (success)
+      res.send({ status: 'Success', message: 'Saved successfully', data: null })
+    else
+      res.send({ status: 'Fail', message: 'Saved Failed', data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Update error', data: null })
+  }
+})
+
+router.post('/room-knowledge-graph-enabled', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const { knowledgeGraphEnabled, roomId } = req.body as { knowledgeGraphEnabled: boolean, roomId: number }
+    const success = await updateRoomKnowledgeGraphEnabled(userId, roomId, knowledgeGraphEnabled)
     if (success)
       res.send({ status: 'Success', message: 'Saved successfully', data: null })
     else

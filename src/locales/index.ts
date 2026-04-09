@@ -22,10 +22,10 @@ const i18n = createI18n<[MessageSchema], Language>({
   fallbackLocale: 'en-US',
   messages: {
     'en-US': enUS,
-    'ja-JP': jaJP,
-    'zh-CN': zhCN,
-    'zh-TW': zhTW,
-    'ko-KR': koKR,
+    'ja-JP': jaJP as MessageSchema,
+    'zh-CN': zhCN as MessageSchema,
+    'zh-TW': zhTW as MessageSchema,
+    'ko-KR': koKR as MessageSchema,
   },
 })
 

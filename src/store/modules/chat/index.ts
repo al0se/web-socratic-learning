@@ -7,6 +7,7 @@ import {
   fetchGetChatRooms,
   fetchRenameChatRoom,
   fetchUpdateChatRoomChatModel,
+  fetchUpdateChatRoomKnowledgeGraphEnabled,
   fetchUpdateChatRoomSearchEnabled,
   fetchUpdateChatRoomToolsEnabled,
   fetchUpdateUserChatModel,
@@ -60,6 +61,7 @@ export const useChatStore = defineStore('chat-store', () => {
       usingContext: result.data?.usingContext ?? true,
       maxContextCount: result.data?.maxContextCount ?? 20,
       searchEnabled: result.data?.searchEnabled,
+      knowledgeGraphEnabled: result.data?.knowledgeGraphEnabled,
       toolsEnabled: result.data?.toolsEnabled,
       imageUploadEnabled: result.data?.imageUploadEnabled,
     })
@@ -149,6 +151,15 @@ export const useChatStore = defineStore('chat-store', () => {
 
     state.chatRooms[index].searchEnabled = searchEnabled
     await fetchUpdateChatRoomSearchEnabled(searchEnabled, state.active!)
+  }
+
+  const setChatKnowledgeGraphEnabled = async (knowledgeGraphEnabled: boolean) => {
+    const index = findRoomIndex(state.active)
+    if (index === -1)
+      return
+
+    state.chatRooms[index].knowledgeGraphEnabled = knowledgeGraphEnabled
+    await fetchUpdateChatRoomKnowledgeGraphEnabled(knowledgeGraphEnabled, state.active!)
   }
 
   const setChatModel = async (chatModel: string) => {
@@ -269,6 +280,7 @@ export const useChatStore = defineStore('chat-store', () => {
     setMaxContextCount,
     setChatModel,
     setChatSearchEnabled,
+    setChatKnowledgeGraphEnabled,
     setChatToolsEnabled,
     addNewChatRoom,
     deleteChatRoom,
