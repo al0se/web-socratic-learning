@@ -126,6 +126,8 @@ export class SearchResult {
   content: string
 }
 
+export type KnowledgeGraphStatus = 'hit' | 'miss' | 'error'
+
 export class ChatInfo {
   _id: ObjectId
   roomId: number
@@ -139,6 +141,8 @@ export class ChatInfo {
   searchResults?: SearchResult[]
   searchUsageTime?: number
   knowledgeGraphQuery?: string
+  knowledgeGraphStatus?: KnowledgeGraphStatus
+  knowledgeGraphMessage?: string
   knowledgeGraphResults?: SearchResult[]
   knowledgeGraphUsageTime?: number
   reasoning?: string

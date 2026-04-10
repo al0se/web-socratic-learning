@@ -9,6 +9,8 @@ const { t } = useI18n()
 interface Props {
   variant?: 'search' | 'knowledgeGraph'
   searchQuery?: string
+  searchStatus?: 'hit' | 'miss' | 'error'
+  searchMessage?: string
   searchResults?: Chat.SearchResult[]
   searchUsageTime?: number
   searchEnd?: boolean
@@ -22,14 +24,16 @@ const uid = instance?.uid || Date.now() + Math.random().toString(36).substring(2
 const textRef = ref<HTMLElement>()
 const isCollapsed = ref(true)
 
+const isKnowledgeGraph = computed(() => props.variant === 'knowledgeGraph')
+
 const searchBtnTitle = computed(() => {
   return t('chat.expandCollapseSearchResults')
 })
 
 const searchHeadingText = computed(() => {
   if (props.searchQuery)
-    return `${props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphQuery') : t('chat.searchQuery')}: ${props.searchQuery}`
-  return props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphSearching') : t('chat.searching')
+    return `${isKnowledgeGraph.value ? t('chat.knowledgeGraphQuery') : t('chat.searchQuery')}: ${props.searchQuery}`
+  return isKnowledgeGraph.value ? t('chat.knowledgeGraphSearching') : t('chat.searching')
 })
 
 const shouldShowSearchingIndicator = computed(() => {
@@ -37,12 +41,56 @@ const shouldShowSearchingIndicator = computed(() => {
 })
 
 const hasSearchResults = computed(() => {
-  return props.searchResults && props.searchResults.length > 0
+  return !!props.searchResults && props.searchResults.length > 0
+})
+
+const fallbackKnowledgeGraphMessage = computed(() => {
+  if (!isKnowledgeGraph.value)
+    return ''
+  if (props.searchStatus === 'miss')
+    return t('chat.knowledgeGraphMissDetail')
+  if (props.searchStatus === 'error')
+    return t('chat.knowledgeGraphErrorDetail')
+  if (props.searchStatus === 'hit' && !hasSearchResults.value)
+    return t('chat.knowledgeGraphHitDetail')
+  return ''
+})
+
+const displayMessage = computed(() => {
+  if (props.searchMessage)
+    return props.searchMessage
+  return fallbackKnowledgeGraphMessage.value
+})
+
+const hasDetailMessage = computed(() => {
+  return !!displayMessage.value && !shouldShowSearchingIndicator.value
+})
+
+const statusLabel = computed(() => {
+  if (!isKnowledgeGraph.value || !props.searchStatus)
+    return ''
+
+  if (props.searchStatus === 'hit')
+    return t('chat.knowledgeGraphHit')
+  if (props.searchStatus === 'miss')
+    return t('chat.knowledgeGraphMiss')
+  return t('chat.knowledgeGraphError')
+})
+
+const statusClass = computed(() => {
+  if (!isKnowledgeGraph.value || !props.searchStatus)
+    return ''
+
+  if (props.searchStatus === 'hit')
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/20 dark:text-emerald-200'
+  if (props.searchStatus === 'miss')
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-400/20 dark:text-amber-200'
+  return 'bg-red-100 text-red-700 dark:bg-red-400/20 dark:text-red-200'
 })
 
 const headerComputedClass = computed(() => {
   return [
-    'flex items-center justify-between',
+    'flex items-center justify-between gap-2',
     'p-2 pl-3 w-fit',
     'bg-blue-100 dark:bg-green-300/30',
     'text-xs select-none font-medium',
@@ -90,16 +138,20 @@ function toggleCollapse() {
       @keydown.enter="hasSearchResults ? toggleCollapse() : null"
       @keydown.space="hasSearchResults ? toggleCollapse() : null"
     >
-      <div class="flex items-center pr-2">
+      <div class="flex items-center pr-2 min-w-0 flex-1">
         <template v-if="shouldShowSearchingIndicator">
           <Spinner class="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
-          <span class="text-blue-700 dark:text-blue-200 truncate">{{ props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphSearching') : t('chat.searching') }}</span>
-          <span class="ml-1.5 mr-5 text-blue-400 dark:text-blue-500">|</span>
+          <span class="text-blue-700 dark:text-blue-200 truncate">{{ isKnowledgeGraph ? t('chat.knowledgeGraphSearching') : t('chat.searching') }}</span>
+          <span class="ml-1.5 mr-3 text-blue-400 dark:text-blue-500">|</span>
         </template>
         <span class="text-blue-800 dark:text-blue-100 truncate">{{ searchHeadingText }}</span>
+        <template v-if="statusLabel">
+          <span class="mx-3 text-blue-400 dark:text-blue-500">|</span>
+          <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px]" :class="statusClass">{{ statusLabel }}</span>
+        </template>
         <template v-if="searchUsageTime">
-          <span class="mr-1.5 ml-5 text-blue-400 dark:text-blue-500">|</span>
-          <span class="text-blue-600 dark:text-blue-300 truncate">{{ `${props.variant === 'knowledgeGraph' ? t('chat.knowledgeGraphUsageTime') : t('chat.searchUsageTime')}: ${searchUsageTime.toFixed(2)}s` }}</span>
+          <span class="mr-1.5 ml-3 text-blue-400 dark:text-blue-500">|</span>
+          <span class="text-blue-600 dark:text-blue-300 truncate">{{ `${isKnowledgeGraph ? t('chat.knowledgeGraphUsageTime') : t('chat.searchUsageTime')}: ${searchUsageTime.toFixed(2)}s` }}</span>
         </template>
       </div>
       <button
@@ -123,6 +175,13 @@ function toggleCollapse() {
       </button>
     </div>
 
+    <div
+      v-if="hasDetailMessage && !hasSearchResults"
+      class="mt-1 rounded-md bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-700 shadow-xs dark:bg-green-300/20 dark:text-gray-200"
+    >
+      {{ displayMessage }}
+    </div>
+
     <div :class="contentWrapperComputedClass">
       <div
         v-if="hasSearchResults"
@@ -133,6 +192,9 @@ function toggleCollapse() {
         :aria-hidden="isCollapsed"
       >
         <div class="w-full space-y-3">
+          <p v-if="hasDetailMessage" class="mb-3 text-xs leading-relaxed text-gray-700 dark:text-gray-200">
+            {{ displayMessage }}
+          </p>
           <div
             v-for="(result, index) in props.searchResults"
             :key="index"

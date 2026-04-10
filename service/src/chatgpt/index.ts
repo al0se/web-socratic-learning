@@ -354,16 +354,26 @@ search result: <search_result>${searchResultContent}</search_result>`,
 
           const knowledgeGraphOutput = await runKnowledgeGraphQuery(knowledgeGraphQuery, knowledgeGraphConfig)
 
-          await updateChatKnowledgeGraphResult(messageId, knowledgeGraphOutput.results, knowledgeGraphOutput.usageTime)
+          await updateChatKnowledgeGraphResult(
+            messageId,
+            knowledgeGraphOutput.status,
+            knowledgeGraphOutput.results,
+            knowledgeGraphOutput.usageTime,
+            knowledgeGraphOutput.message,
+          )
 
           process?.({
+            knowledgeGraphStatus: knowledgeGraphOutput.status,
+            knowledgeGraphMessage: knowledgeGraphOutput.message,
             knowledgeGraphResults: knowledgeGraphOutput.results,
             knowledgeGraphUsageTime: knowledgeGraphOutput.usageTime,
           })
 
-          const knowledgeGraphInstruction = renderSystemMessage(DEFAULT_KNOWLEDGE_GRAPH_RESULT_SYSTEM_MESSAGE, currentTime)
-          instructions = combineInstructions(instructions, `${knowledgeGraphInstruction}\n\n${knowledgeGraphOutput.prompt}`)
-          hasKnowledgeGraphResult = true
+          if (knowledgeGraphOutput.status === 'hit') {
+            const knowledgeGraphInstruction = renderSystemMessage(DEFAULT_KNOWLEDGE_GRAPH_RESULT_SYSTEM_MESSAGE, currentTime)
+            instructions = combineInstructions(instructions, `${knowledgeGraphInstruction}\n\n${knowledgeGraphOutput.prompt}`)
+            hasKnowledgeGraphResult = true
+          }
         }
         else {
           process?.({
@@ -373,8 +383,11 @@ search result: <search_result>${searchResultContent}</search_result>`,
       }
       catch (error) {
         globalThis.console.error('knowledge graph query error, ', error)
+        await updateChatKnowledgeGraphResult(messageId, 'error', [], 0, error instanceof Error ? error.message : 'Knowledge graph query failed')
         process?.({
           knowledgeGraphSearching: false,
+          knowledgeGraphStatus: 'error',
+          knowledgeGraphMessage: error instanceof Error ? error.message : 'Knowledge graph query failed',
         })
       }
     }

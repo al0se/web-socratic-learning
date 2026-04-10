@@ -1,4 +1,4 @@
-import type { KnowledgeGraphConfig, SearchResult } from './storage/model'
+import type { KnowledgeGraphConfig, KnowledgeGraphStatus, SearchResult } from './storage/model'
 import { spawn } from 'node:child_process'
 import * as path from 'node:path'
 import * as process from 'node:process'
@@ -19,6 +19,8 @@ interface LightRAGScriptResponse {
 }
 
 export interface KnowledgeGraphQueryOutput {
+  status: KnowledgeGraphStatus
+  message?: string
   prompt: string
   results: SearchResult[]
   usageTime: number
@@ -77,6 +79,13 @@ function buildKnowledgeGraphResults(data: LightRAGScriptResponse['data'], maxRes
   }
 
   return results.filter(result => isNotEmptyString(result.content))
+}
+
+function isNoContextResponse(response: LightRAGScriptResponse, prompt: string, results: SearchResult[]) {
+  if (prompt.includes('[no-context]'))
+    return true
+
+  return !isNotEmptyString(response.message) && !isNotEmptyString(prompt) && results.length === 0
 }
 
 export async function runKnowledgeGraphQuery(query: string, knowledgeGraphConfig: KnowledgeGraphConfig): Promise<KnowledgeGraphQueryOutput> {
@@ -164,14 +173,42 @@ export async function runKnowledgeGraphQuery(query: string, knowledgeGraphConfig
     child.stdin.end()
   })
 
+  const prompt = response.prompt || ''
+  const results = buildKnowledgeGraphResults(response.data, maxResults)
+  const usageTime = (Date.now() - start) / 1000
+
   if (response.status !== 'success') {
+    if (isNoContextResponse(response, prompt, results)) {
+      return {
+        status: 'miss',
+        message: '',
+        prompt: '',
+        results: [],
+        usageTime,
+        metadata: response.metadata,
+      }
+    }
+
     throw new Error(response.message || 'LightRAG query failed')
   }
 
+  if (isNoContextResponse(response, prompt, results)) {
+    return {
+      status: 'miss',
+      message: '',
+      prompt: '',
+      results: [],
+      usageTime,
+      metadata: response.metadata,
+    }
+  }
+
   return {
-    prompt: response.prompt || '',
-    results: buildKnowledgeGraphResults(response.data, maxResults),
-    usageTime: (Date.now() - start) / 1000,
+    status: 'hit',
+    message: results.length > 0 ? '' : 'LightRAG retrieved context, but there are no displayable knowledge graph items.',
+    prompt,
+    results,
+    usageTime,
     metadata: response.metadata,
   }
 }

@@ -96,6 +96,12 @@
     "knowledgeGraphSearching": "知识图谱查询中",
     "knowledgeGraphQuery": "知识图谱查询词",
     "knowledgeGraphUsageTime": "知识图谱用时",
+    "knowledgeGraphHit": "已命中",
+    "knowledgeGraphMiss": "未命中",
+    "knowledgeGraphError": "查询失败",
+    "knowledgeGraphHitDetail": "本轮对话已使用知识图谱，但当前没有可展示的检索条目。",
+    "knowledgeGraphMissDetail": "本轮对话已触发知识图谱查询，但没有检索到相关的本地上下文。",
+    "knowledgeGraphErrorDetail": "知识图谱查询失败，未能注入可用的本地上下文。",
     "expandCollapseSearchResults": "展开/折叠搜索结果"
   },
   "setting": {

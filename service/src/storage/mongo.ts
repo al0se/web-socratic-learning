@@ -5,6 +5,7 @@ import type {
   GiftCard,
   ImageUsageItem,
   KeyConfig,
+  KnowledgeGraphStatus,
   SearchResult,
   UsageResponse,
   UserPrompt,
@@ -337,15 +338,29 @@ export async function updateChatKnowledgeGraphQuery(chatId: string, knowledgeGra
     $set: {
       knowledgeGraphQuery,
     },
+    $unset: {
+      knowledgeGraphStatus: true as const,
+      knowledgeGraphMessage: true as const,
+      knowledgeGraphResults: true as const,
+      knowledgeGraphUsageTime: true as const,
+    },
   }
   const result = await chatCol.updateOne(query, update)
   return result.modifiedCount > 0
 }
 
-export async function updateChatKnowledgeGraphResult(chatId: string, knowledgeGraphResults: SearchResult[], knowledgeGraphUsageTime: number) {
+export async function updateChatKnowledgeGraphResult(
+  chatId: string,
+  knowledgeGraphStatus: KnowledgeGraphStatus,
+  knowledgeGraphResults: SearchResult[],
+  knowledgeGraphUsageTime: number,
+  knowledgeGraphMessage?: string,
+) {
   const query = { _id: new ObjectId(chatId) }
   const update = {
     $set: {
+      knowledgeGraphStatus,
+      knowledgeGraphMessage: knowledgeGraphMessage || '',
       knowledgeGraphResults,
       knowledgeGraphUsageTime,
     },

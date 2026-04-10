@@ -26,6 +26,8 @@ interface Props {
   searchResults?: Chat.SearchResult[]
   searchUsageTime?: number
   knowledgeGraphQuery?: string
+  knowledgeGraphStatus?: 'hit' | 'miss' | 'error'
+  knowledgeGraphMessage?: string
   knowledgeGraphResults?: Chat.SearchResult[]
   knowledgeGraphUsageTime?: number
   reasoning?: string
@@ -239,12 +241,14 @@ function isEventTargetValid(event: any) {
         :loading="loading"
       />
       <Search
-        v-if="knowledgeGraphSearching || knowledgeGraphQuery"
+        v-if="knowledgeGraphSearching || knowledgeGraphQuery || knowledgeGraphStatus"
         variant="knowledgeGraph"
         :search-query="knowledgeGraphQuery"
+        :search-status="knowledgeGraphStatus"
+        :search-message="knowledgeGraphMessage"
         :search-results="knowledgeGraphResults"
         :search-usage-time="knowledgeGraphUsageTime"
-        :search-end="!!knowledgeGraphResults || !!reasoning || !!text"
+        :search-end="knowledgeGraphStatus === 'hit' || knowledgeGraphStatus === 'miss' || knowledgeGraphStatus === 'error' || !!reasoning || !!text"
         :loading="loading"
       />
       <Reasoning

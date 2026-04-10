@@ -96,6 +96,12 @@
     "knowledgeGraphSearching": "Knowledge graph querying",
     "knowledgeGraphQuery": "Knowledge graph query",
     "knowledgeGraphUsageTime": "Knowledge graph time",
+    "knowledgeGraphHit": "Hit",
+    "knowledgeGraphMiss": "No hit",
+    "knowledgeGraphError": "Failed",
+    "knowledgeGraphHitDetail": "The knowledge graph participated in this turn, but there are no displayable retrieval items.",
+    "knowledgeGraphMissDetail": "The knowledge graph participated in this turn, but no relevant local context was retrieved.",
+    "knowledgeGraphErrorDetail": "The knowledge graph query failed before any usable local context was injected.",
     "expandCollapseSearchResults": "Expand/Collapse Search Results"
   },
   "setting": {

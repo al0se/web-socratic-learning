@@ -24,6 +24,7 @@ interface SSEEventHandlers {
   onSearchQuery?: (data: { searchQuery: string }) => void
   onSearchResults?: (data: { searchResults: any[], searchUsageTime: number }) => void
   onKnowledgeGraphQuery?: (data: { knowledgeGraphQuery: string }) => void
+  onKnowledgeGraphState?: (data: { knowledgeGraphStatus: 'hit' | 'miss' | 'error', knowledgeGraphMessage?: string, knowledgeGraphResults?: any[], knowledgeGraphUsageTime?: number }) => void
   onKnowledgeGraphResults?: (data: { knowledgeGraphResults: any[], knowledgeGraphUsageTime: number }) => void
   onToolCalls?: (data: { tool_calls?: Array<{ type: string, result?: string }> }) => void
   onComplete?: (data: any) => void
@@ -125,7 +126,10 @@ export function fetchChatAPIProcessSSE(
               else if (jsonData.knowledgeGraphQuery) {
                 handlers.onKnowledgeGraphQuery?.(jsonData)
               }
-              else if (jsonData.knowledgeGraphResults) {
+              else if (jsonData.knowledgeGraphStatus !== undefined) {
+                handlers.onKnowledgeGraphState?.(jsonData)
+              }
+              else if (jsonData.knowledgeGraphResults !== undefined) {
                 handlers.onKnowledgeGraphResults?.(jsonData)
               }
               else if (jsonData.tool_calls) {

@@ -1,5 +1,5 @@
 import type OpenAI from 'openai'
-import type { ChatRoom, ImageUsageItem, SearchResult, UserInfo } from 'src/storage/model'
+import type { ChatRoom, ImageUsageItem, KnowledgeGraphStatus, SearchResult, UserInfo } from 'src/storage/model'
 import type { ImageGenerationTool } from '../types'
 
 export interface ChatMessage {
@@ -21,6 +21,8 @@ export interface ResponseChunk {
   searchResults?: SearchResult[]
   searchUsageTime?: number
   knowledgeGraphQuery?: string
+  knowledgeGraphStatus?: KnowledgeGraphStatus
+  knowledgeGraphMessage?: string
   knowledgeGraphResults?: SearchResult[]
   knowledgeGraphUsageTime?: number
   text?: string

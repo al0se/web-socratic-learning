@@ -21,6 +21,8 @@ declare namespace Chat {
     searchResults?: SearchResult[]
     searchUsageTime?: number
     knowledgeGraphQuery?: string
+    knowledgeGraphStatus?: 'hit' | 'miss' | 'error'
+    knowledgeGraphMessage?: string
     knowledgeGraphResults?: SearchResult[]
     knowledgeGraphUsageTime?: number
     reasoning?: string

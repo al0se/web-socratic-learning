@@ -99,6 +99,8 @@ router.get('/chat-history', auth, async (req, res) => {
           searchResults: c.searchResults,
           searchUsageTime: c.searchUsageTime,
           knowledgeGraphQuery: c.knowledgeGraphQuery,
+          knowledgeGraphStatus: c.knowledgeGraphStatus,
+          knowledgeGraphMessage: c.knowledgeGraphMessage,
           knowledgeGraphResults: c.knowledgeGraphResults,
           knowledgeGraphUsageTime: c.knowledgeGraphUsageTime,
           reasoning: c.reasoning,
@@ -344,7 +346,15 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
           if (chunk.knowledgeGraphQuery) {
             sendSSEData('knowledge_graph_query', { knowledgeGraphQuery: chunk.knowledgeGraphQuery })
           }
-          if (chunk.knowledgeGraphResults) {
+          if (chunk.knowledgeGraphStatus !== undefined) {
+            sendSSEData('knowledge_graph_state', {
+              knowledgeGraphStatus: chunk.knowledgeGraphStatus,
+              knowledgeGraphMessage: chunk.knowledgeGraphMessage,
+              knowledgeGraphResults: chunk.knowledgeGraphResults,
+              knowledgeGraphUsageTime: chunk.knowledgeGraphUsageTime,
+            })
+          }
+          if (chunk.knowledgeGraphResults !== undefined) {
             sendSSEData('knowledge_graph_results', {
               knowledgeGraphResults: chunk.knowledgeGraphResults,
               knowledgeGraphUsageTime: chunk.knowledgeGraphUsageTime,

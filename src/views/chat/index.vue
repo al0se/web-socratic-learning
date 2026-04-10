@@ -272,6 +272,8 @@ async function onConversation() {
       let searchResults: Chat.SearchResult[]
       let searchUsageTime: number
       let knowledgeGraphQuery: string
+      let knowledgeGraphStatus: Chat.Chat['knowledgeGraphStatus']
+      let knowledgeGraphMessage: string
       let knowledgeGraphResults: Chat.SearchResult[]
       let knowledgeGraphUsageTime: number
 
@@ -325,6 +327,33 @@ async function onConversation() {
         onKnowledgeGraphQuery: (data) => {
           knowledgeGraphQuery = data.knowledgeGraphQuery
           knowledgeGraphSearching = false
+          chatStore.updateChatMessage(
+            currentChatRoom.value!.roomId,
+            dataSources.value.length - 1,
+            {
+              knowledgeGraphSearching: false,
+              knowledgeGraphQuery: data.knowledgeGraphQuery,
+            },
+          )
+        },
+        onKnowledgeGraphState: (data) => {
+          knowledgeGraphStatus = data.knowledgeGraphStatus
+          knowledgeGraphMessage = data.knowledgeGraphMessage || ''
+          if (data.knowledgeGraphResults !== undefined)
+            knowledgeGraphResults = data.knowledgeGraphResults
+          if (data.knowledgeGraphUsageTime !== undefined)
+            knowledgeGraphUsageTime = data.knowledgeGraphUsageTime
+          chatStore.updateChatMessage(
+            currentChatRoom.value!.roomId,
+            dataSources.value.length - 1,
+            {
+              knowledgeGraphSearching: false,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
+            },
+          )
         },
         onKnowledgeGraphResults: (data) => {
           knowledgeGraphResults = data.knowledgeGraphResults
@@ -384,6 +413,8 @@ async function onConversation() {
               searchResults,
               searchUsageTime,
               knowledgeGraphQuery,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
               knowledgeGraphResults,
               knowledgeGraphUsageTime,
               reasoning: accumulatedReasoning,
@@ -412,6 +443,10 @@ async function onConversation() {
             knowledgeGraphQuery = data.knowledgeGraphQuery
             knowledgeGraphSearching = false
           }
+          if (data.knowledgeGraphStatus !== undefined)
+            knowledgeGraphStatus = data.knowledgeGraphStatus
+          if (data.knowledgeGraphMessage !== undefined)
+            knowledgeGraphMessage = data.knowledgeGraphMessage
           if (data.knowledgeGraphResults)
             knowledgeGraphResults = data.knowledgeGraphResults
           if (data.knowledgeGraphUsageTime)
@@ -437,6 +472,8 @@ async function onConversation() {
               searchResults,
               searchUsageTime,
               knowledgeGraphQuery,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
               knowledgeGraphResults,
               knowledgeGraphUsageTime,
               reasoning: data?.reasoning,
@@ -497,6 +534,8 @@ async function onConversation() {
               searchResults,
               searchUsageTime,
               knowledgeGraphQuery,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
               knowledgeGraphResults,
               knowledgeGraphUsageTime,
               reasoning: data?.reasoning || accumulatedReasoning,
@@ -634,6 +673,8 @@ async function onRegenerate(index: number) {
       let searchResults: Chat.SearchResult[]
       let searchUsageTime: number
       let knowledgeGraphQuery: string
+      let knowledgeGraphStatus: Chat.Chat['knowledgeGraphStatus']
+      let knowledgeGraphMessage: string
       let knowledgeGraphResults: Chat.SearchResult[]
       let knowledgeGraphUsageTime: number
 
@@ -688,6 +729,33 @@ async function onRegenerate(index: number) {
         onKnowledgeGraphQuery: (data) => {
           knowledgeGraphQuery = data.knowledgeGraphQuery
           knowledgeGraphSearching = false
+          updateChatSome(
+            currentChatRoom.value!.roomId,
+            index,
+            {
+              knowledgeGraphSearching: false,
+              knowledgeGraphQuery: data.knowledgeGraphQuery,
+            },
+          )
+        },
+        onKnowledgeGraphState: (data) => {
+          knowledgeGraphStatus = data.knowledgeGraphStatus
+          knowledgeGraphMessage = data.knowledgeGraphMessage || ''
+          if (data.knowledgeGraphResults !== undefined)
+            knowledgeGraphResults = data.knowledgeGraphResults
+          if (data.knowledgeGraphUsageTime !== undefined)
+            knowledgeGraphUsageTime = data.knowledgeGraphUsageTime
+          updateChatSome(
+            currentChatRoom.value!.roomId,
+            index,
+            {
+              knowledgeGraphSearching: false,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
+              knowledgeGraphResults,
+              knowledgeGraphUsageTime,
+            },
+          )
         },
         onKnowledgeGraphResults: (data) => {
           knowledgeGraphResults = data.knowledgeGraphResults
@@ -748,6 +816,8 @@ async function onRegenerate(index: number) {
               searchResults,
               searchUsageTime,
               knowledgeGraphQuery,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
               knowledgeGraphResults,
               knowledgeGraphUsageTime,
               reasoning: accumulatedReasoning,
@@ -777,6 +847,10 @@ async function onRegenerate(index: number) {
             knowledgeGraphQuery = data.knowledgeGraphQuery
             knowledgeGraphSearching = false
           }
+          if (data.knowledgeGraphStatus !== undefined)
+            knowledgeGraphStatus = data.knowledgeGraphStatus
+          if (data.knowledgeGraphMessage !== undefined)
+            knowledgeGraphMessage = data.knowledgeGraphMessage
           if (data.knowledgeGraphResults)
             knowledgeGraphResults = data.knowledgeGraphResults
           if (data.knowledgeGraphUsageTime)
@@ -801,6 +875,8 @@ async function onRegenerate(index: number) {
               searchResults,
               searchUsageTime,
               knowledgeGraphQuery,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
               knowledgeGraphResults,
               knowledgeGraphUsageTime,
               reasoning: data?.reasoning,
@@ -847,6 +923,8 @@ async function onRegenerate(index: number) {
               searchResults,
               searchUsageTime,
               knowledgeGraphQuery,
+              knowledgeGraphStatus,
+              knowledgeGraphMessage,
               knowledgeGraphResults,
               knowledgeGraphUsageTime,
               reasoning: data?.reasoning || accumulatedReasoning,
@@ -1482,6 +1560,8 @@ onUnmounted(() => {
                   :search-results="item?.searchResults"
                   :search-usage-time="item?.searchUsageTime"
                   :knowledge-graph-query="item?.knowledgeGraphQuery"
+                  :knowledge-graph-status="item?.knowledgeGraphStatus"
+                  :knowledge-graph-message="item?.knowledgeGraphMessage"
                   :knowledge-graph-results="item?.knowledgeGraphResults"
                   :knowledge-graph-usage-time="item?.knowledgeGraphUsageTime"
                   :reasoning="item?.reasoning"
