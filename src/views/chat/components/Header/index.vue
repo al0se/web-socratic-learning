@@ -35,10 +35,6 @@ function onScrollToTop() {
 function handleExport() {
   emit('export')
 }
-
-function handleShowPrompt() {
-  emit('toggleShowPrompt')
-}
 </script>
 
 <template>
@@ -62,11 +58,17 @@ function handleShowPrompt() {
         {{ currentChatHistory?.title ?? '' }}
       </h1>
       <div class="flex items-center space-x-2">
-        <HoverButton @click="handleShowPrompt">
-          <span class="text-xl text-[#4f555e] dark:text-white">
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="flex items-center justify-center h-10 cursor-not-allowed opacity-60"
+          style="flex-flow:row nowrap;min-width:2.5em;padding:.5em;border-radius:.5em;"
+        >
+          <span class="text-xl text-[#9ca3af] dark:text-neutral-500">
             <IconPrompt class="w-[20px] m-auto" />
           </span>
-        </HoverButton>
+        </button>
         <HoverButton @click="handleExport">
           <span class="text-xl text-[#4f555e] dark:text-white">
             <IconRiDownload2Line />

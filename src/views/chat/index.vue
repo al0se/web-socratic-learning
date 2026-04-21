@@ -1668,11 +1668,18 @@ onUnmounted(() => {
                 <IconRiDownload2Line />
               </span>
             </HoverButton>
-            <HoverButton v-if="!isMobile" @click="showPrompt = true">
-              <span class="text-xl text-[#4f555e] dark:text-white">
+            <button
+              v-if="!isMobile"
+              type="button"
+              disabled
+              aria-disabled="true"
+              class="flex items-center justify-center h-10 cursor-not-allowed opacity-60"
+              style="flex-flow:row nowrap;min-width:2.5em;padding:.5em;border-radius:.5em;"
+            >
+              <span class="text-xl text-[#9ca3af] dark:text-neutral-500">
                 <IconPrompt class="w-[20px] m-auto" />
               </span>
-            </HoverButton>
+            </button>
             <NSelect
               :style="{ width: isMobile ? '100%' : '250px' }"
               :value="currentChatRoom?.chatModel"

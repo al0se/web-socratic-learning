@@ -11,6 +11,9 @@ const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const testText = ref<string>('What learning methods are mentioned in the lessons?')
+const defaultKnowledgeGraphRepoDir = 'knowledge-graph/LightRAG'
+const defaultKnowledgeGraphPythonPath = 'python'
+const defaultKnowledgeGraphWorkingDir = 'knowledge-graph/lesson_kb'
 
 const queryModeOptions: { label: string, key: KnowledgeGraphQueryMode, value: KnowledgeGraphQueryMode }[] = [
   { label: 'Mix', key: 'mix', value: 'mix' },
@@ -28,9 +31,9 @@ async function fetchConfig() {
     const { data } = await fetchChatConfig<ConfigState>()
     if (!data.knowledgeGraphConfig) {
       data.knowledgeGraphConfig = new KnowledgeGraphConfig(false, {
-        repoDir: 'D:\\learn-agent\\LightRAG',
-        pythonPath: 'D:\\learn-agent\\LightRAG\\.venv\\Scripts\\python.exe',
-        workingDir: 'D:\\learn-agent\\data\\lesson_kb',
+        repoDir: defaultKnowledgeGraphRepoDir,
+        pythonPath: defaultKnowledgeGraphPythonPath,
+        workingDir: defaultKnowledgeGraphWorkingDir,
         workspace: '',
         queryMode: 'mix',
         maxResults: 10,
@@ -46,11 +49,11 @@ async function fetchConfig() {
     if (!data.knowledgeGraphConfig.options)
       data.knowledgeGraphConfig.options = {}
     if (!data.knowledgeGraphConfig.options.repoDir)
-      data.knowledgeGraphConfig.options.repoDir = 'D:\\learn-agent\\LightRAG'
+      data.knowledgeGraphConfig.options.repoDir = defaultKnowledgeGraphRepoDir
     if (!data.knowledgeGraphConfig.options.pythonPath)
-      data.knowledgeGraphConfig.options.pythonPath = 'D:\\learn-agent\\LightRAG\\.venv\\Scripts\\python.exe'
+      data.knowledgeGraphConfig.options.pythonPath = defaultKnowledgeGraphPythonPath
     if (!data.knowledgeGraphConfig.options.workingDir)
-      data.knowledgeGraphConfig.options.workingDir = 'D:\\learn-agent\\data\\lesson_kb'
+      data.knowledgeGraphConfig.options.workingDir = defaultKnowledgeGraphWorkingDir
     if (data.knowledgeGraphConfig.options.workspace === undefined)
       data.knowledgeGraphConfig.options.workspace = ''
     if (!data.knowledgeGraphConfig.options.queryMode)

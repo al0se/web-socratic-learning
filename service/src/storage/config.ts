@@ -7,9 +7,9 @@ import { getConfig, getKeys, upsertKey } from './mongo'
 
 const DEFAULT_SEARCH_QUERY_SYSTEM_MESSAGE = 'Current time: {current_time}. Decide whether web search is needed for the user request. If web search is needed, return exactly one query wrapped in <search_query>...</search_query>. If web search is not needed, return <search_query></search_query>. Do not answer the user. Do not output any other text. Keep the query under 300 characters.'
 const DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE = 'Current time: {current_time}. Web search results are provided in the conversation. Use them as the primary source for recent or time-sensitive facts. If the provided search results are sufficient, do not say that you cannot access real-time information. If the results are insufficient or conflicting, say what is missing or uncertain. Respond in the same language as the user.'
-const DEFAULT_KNOWLEDGE_GRAPH_REPO_DIR = 'D:\\learn-agent\\LightRAG'
-const DEFAULT_KNOWLEDGE_GRAPH_PYTHON_PATH = 'D:\\learn-agent\\LightRAG\\.venv\\Scripts\\python.exe'
-const DEFAULT_KNOWLEDGE_GRAPH_WORKING_DIR = 'D:\\learn-agent\\data\\lesson_kb'
+const DEFAULT_KNOWLEDGE_GRAPH_REPO_DIR = 'knowledge-graph/LightRAG'
+const DEFAULT_KNOWLEDGE_GRAPH_PYTHON_PATH = process.platform === 'win32' ? 'python' : 'python3'
+const DEFAULT_KNOWLEDGE_GRAPH_WORKING_DIR = 'knowledge-graph/lesson_kb'
 
 let cachedConfig: Config | undefined
 let cacheExpiration = 0

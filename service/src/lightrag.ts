@@ -1,5 +1,6 @@
 import type { KnowledgeGraphConfig, KnowledgeGraphStatus, SearchResult } from './storage/model'
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import * as path from 'node:path'
 import * as process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -88,13 +89,45 @@ function isNoContextResponse(response: LightRAGScriptResponse, prompt: string, r
   return !isNotEmptyString(response.message) && !isNotEmptyString(prompt) && results.length === 0
 }
 
+function getKnowledgeGraphProjectRoot(currentDirPath: string) {
+  const candidates = [
+    process.cwd(),
+    path.resolve(process.cwd(), '..'),
+    path.resolve(currentDirPath, '..'),
+    path.resolve(currentDirPath, '..', '..'),
+    path.resolve(currentDirPath, '..', '..', '..'),
+  ]
+
+  return candidates.find(candidate => existsSync(path.resolve(candidate, 'knowledge-graph')))
+    ?? process.cwd()
+}
+
+function resolveKnowledgeGraphPath(projectRoot: string, value: string | undefined, fallback: string) {
+  const finalValue = value || fallback
+  return path.isAbsolute(finalValue) ? finalValue : path.resolve(projectRoot, finalValue)
+}
+
+function resolvePythonCommand(projectRoot: string, value: string | undefined, fallback: string) {
+  const finalValue = value || fallback
+  if (path.isAbsolute(finalValue))
+    return finalValue
+
+  // Relative script paths should resolve from the project root, but bare commands
+  // like "python" / "python3" should still use the system PATH.
+  if (finalValue.includes('/') || finalValue.includes('\\'))
+    return path.resolve(projectRoot, finalValue)
+
+  return finalValue
+}
+
 export async function runKnowledgeGraphQuery(query: string, knowledgeGraphConfig: KnowledgeGraphConfig): Promise<KnowledgeGraphQueryOutput> {
   const options = knowledgeGraphConfig.options || {}
-  const repoDir = options.repoDir || 'D:\\learn-agent\\LightRAG'
-  const pythonPath = options.pythonPath || 'D:\\learn-agent\\LightRAG\\.venv\\Scripts\\python.exe'
-  const workingDir = options.workingDir || 'D:\\learn-agent\\data\\lesson_kb'
   const currentFilePath = fileURLToPath(import.meta.url)
   const currentDirPath = path.dirname(currentFilePath)
+  const projectRoot = getKnowledgeGraphProjectRoot(currentDirPath)
+  const repoDir = resolveKnowledgeGraphPath(projectRoot, options.repoDir, 'knowledge-graph/LightRAG')
+  const pythonPath = resolvePythonCommand(projectRoot, options.pythonPath, process.platform === 'win32' ? 'python' : 'python3')
+  const workingDir = resolveKnowledgeGraphPath(projectRoot, options.workingDir, 'knowledge-graph/lesson_kb')
   const scriptPath = path.resolve(currentDirPath, '../scripts/lightrag_query.py')
   const timeoutMs = clampNumber(options.timeoutMs, 120000, 1000, 300000)
   const maxResults = clampNumber(options.maxResults, 10, 1, 20)
