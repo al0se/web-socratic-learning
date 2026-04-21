@@ -27,6 +27,8 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+__pycache__/
+*.py[cod]
 
 # Environment variables files
 /service/.env

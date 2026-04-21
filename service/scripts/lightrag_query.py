@@ -63,6 +63,8 @@ async def main():
 
     repo_dir = request["repoDir"]
     os.chdir(repo_dir)
+    if repo_dir not in sys.path:
+        sys.path.insert(0, repo_dir)
 
     from lightrag import LightRAG, QueryParam
 

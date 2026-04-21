@@ -10,7 +10,8 @@ This change sets `prompt/prompt.txt` as the default prompt for chat rooms.
 
 ## Source Prompt File
 
-- Path: `D:\hci\mathtutor\chatgpt-web-main\prompt\prompt.txt`
+- Path: `prompt/prompt.txt`
+- Resolved relative to the repository root
 - Encoding: UTF-8
 
 ## Files Changed

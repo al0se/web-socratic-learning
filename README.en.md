@@ -99,15 +99,16 @@ Uses the official `OpenAI API` to access `ChatGPT`:
 [Details](https://github.com/Chanzhaoyu/chatgpt-web/issues/138)
 
 Setup:
-1. Go to the `service/.env.example` file and copy the contents to the `service/.env` file.
-2. Fill in the `OPENAI_API_KEY` field with your OpenAI API Key [(Get apiKey)](https://platform.openai.com/overview).
+1. Copy `service/.env.example` to `service/.env`.
+2. Copy `.env.example` to `.env` if you need to override frontend defaults locally.
+3. Fill in the `OPENAI_API_KEY` field with your OpenAI API Key [(Get apiKey)](https://platform.openai.com/overview).
 
 Environment Variables:
 
 For all parameter variables, check [here](#docker-parameter-example) or see:
 
 ```
-/service/.env
+/service/.env.example
 ```
 
 ## Roadmap

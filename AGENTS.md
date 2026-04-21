@@ -58,5 +58,6 @@
 
 ## Configuration & Environment
 - Backend secrets live in `service/.env` (copy from `service/.env.example`).
-- Frontend API base URL is in root `.env` as `VITE_GLOB_API_URL`.
+- Frontend defaults live in root `.env.example`; copy it to `.env` for local overrides.
+- Frontend API base URL is configured via `VITE_GLOB_API_URL`.
 - Required Node version: `^20 || ^22 || ^24`.
