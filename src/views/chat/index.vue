@@ -9,7 +9,6 @@ import {
 } from '@/api'
 import { HoverButton } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
-import IconPrompt from '@/icons/Prompt.vue'
 import { useAuthStore, useChatStore, useUserStore } from '@/store'
 import { debounce } from '@/utils/functions/debounce'
 import { Message } from './components'
@@ -18,8 +17,6 @@ import { useChat } from './hooks/useChat'
 import { useScroll } from './hooks/useScroll'
 
 const { t } = useI18n()
-
-const Prompt = defineAsyncComponent(() => import('@/components/common/Setting/Prompt.vue'))
 
 let controller = new AbortController()
 
@@ -46,7 +43,6 @@ const prompt = ref<string>('')
 const firstLoading = ref<boolean>(false)
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
-const showPrompt = ref(false)
 
 const loadingChatUuid = ref<number>(-1)
 
@@ -1528,9 +1524,7 @@ onUnmounted(() => {
   <div class="flex flex-col w-full h-full">
     <HeaderComponent
       v-if="isMobile"
-      :show-prompt="showPrompt"
       @export="handleExport"
-      @toggle-show-prompt="showPrompt = true"
     />
     <main class="flex-1 overflow-hidden">
       <div id="scrollRef" ref="scrollRef" class="h-full overflow-hidden overflow-y-auto" @scroll="handleScroll">
@@ -1668,18 +1662,6 @@ onUnmounted(() => {
                 <IconRiDownload2Line />
               </span>
             </HoverButton>
-            <button
-              v-if="!isMobile"
-              type="button"
-              disabled
-              aria-disabled="true"
-              class="flex items-center justify-center h-10 cursor-not-allowed opacity-60"
-              style="flex-flow:row nowrap;min-width:2.5em;padding:.5em;border-radius:.5em;"
-            >
-              <span class="text-xl text-[#9ca3af] dark:text-neutral-500">
-                <IconPrompt class="w-[20px] m-auto" />
-              </span>
-            </button>
             <NSelect
               :style="{ width: isMobile ? '100%' : '250px' }"
               :value="currentChatRoom?.chatModel"
@@ -1735,6 +1717,5 @@ onUnmounted(() => {
         </NSpace>
       </div>
     </footer>
-    <Prompt v-if="showPrompt" v-model:room-id="uuid" v-model:visible="showPrompt" />
   </div>
 </template>
