@@ -55,6 +55,8 @@
   "memory": {
     "title": "记忆",
     "description": "查看和编辑存储在数据库中的长期记忆。学习者画像保存稳定特征和偏好；学习摘要保存学习旅程。",
+    "summaryLabel": "学习摘要",
+    "profileLabel": "学习者画像",
     "summaryDescription": "学习旅程、当前重点、已完成内容和待解决问题。",
     "profileDescription": "稳定身份、学习风格、知识水平和偏好。",
     "reload": "重新加载",
