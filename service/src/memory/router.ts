@@ -21,12 +21,13 @@ interface MemoryClearRequest {
 
 export const router = Router()
 
-router.get('/memory', auth, async (_req, res) => {
+router.get('/memory', auth, async (req, res) => {
   try {
+    const userId = req.headers.userId as string
     res.send({
       status: 'Success',
       message: null,
-      data: getMemoryService().readSnapshot(),
+      data: await getMemoryService().readSnapshot(userId),
     })
   }
   catch (error) {
@@ -40,6 +41,7 @@ router.get('/memory', auth, async (_req, res) => {
 
 async function updateMemory(req, res) {
   try {
+    const userId = req.headers.userId as string
     const payload = req.body as FileUpdateRequest
     if (!isMemoryFile(payload.file)) {
       res.send({
@@ -50,7 +52,7 @@ async function updateMemory(req, res) {
       return
     }
 
-    const snapshot = getMemoryService().writeFile(payload.file, payload.content || '')
+    const snapshot = await getMemoryService().writeFile(userId, payload.file, payload.content || '')
     res.send({
       status: 'Success',
       message: null,
@@ -96,7 +98,7 @@ router.post('/memory/refresh', auth, async (req, res) => {
       user,
       userId,
     })
-    const snapshot = getMemoryService().readSnapshot()
+    const snapshot = await getMemoryService().readSnapshot(userId)
 
     res.send({
       status: 'Success',
@@ -118,6 +120,7 @@ router.post('/memory/refresh', auth, async (req, res) => {
 
 router.post('/memory/clear', auth, async (req, res) => {
   try {
+    const userId = req.headers.userId as string
     const payload = req.body as MemoryClearRequest | undefined
     if (payload?.file && !isMemoryFile(payload.file)) {
       res.send({
@@ -129,8 +132,8 @@ router.post('/memory/clear', auth, async (req, res) => {
     }
 
     const snapshot = payload?.file
-      ? getMemoryService().clearFile(payload.file)
-      : getMemoryService().clearMemory()
+      ? await getMemoryService().clearFile(userId, payload.file)
+      : await getMemoryService().clearMemory(userId)
 
     res.send({
       status: 'Success',

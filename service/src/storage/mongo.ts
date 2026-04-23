@@ -6,6 +6,7 @@ import type {
   ImageUsageItem,
   KeyConfig,
   KnowledgeGraphStatus,
+  MemoryFile,
   SearchResult,
   UsageResponse,
   UserPrompt,
@@ -17,7 +18,7 @@ import { DEFAULT_ROOM_PROMPT } from '../utils'
 import { hasAnyRole } from '../utils/is'
 import { md5 } from '../utils/security'
 import { getCacheApiKeys, getCacheConfig } from './config'
-import { ChatInfo, ChatRoom, ChatUsage, Status, UserConfig, UserInfo, UserRole } from './model'
+import { ChatInfo, ChatRoom, ChatUsage, MemoryInfo, Status, UserConfig, UserInfo, UserRole } from './model'
 
 let client: MongoClient
 let dbName: string
@@ -32,6 +33,7 @@ let usageCol: Collection<ChatUsage>
 let keyCol: Collection<KeyConfig>
 let userPromptCol: Collection<UserPrompt>
 let redeemCol: Collection<GiftCard>
+let memoryCol: Collection<MemoryInfo>
 
 /**
  * Initialize all database indexes
@@ -158,6 +160,20 @@ async function initializeIndexes() {
 
     globalThis.console.log('key_config collection indexes created')
 
+    // ============================================
+    // memory collection indexes
+    // ============================================
+    try {
+      await memoryCol.createIndex({ userId: 1 }, { name: 'uidx_userId', unique: true })
+    }
+    catch (error: any) {
+      if (!error.message?.includes('E11000') && !error.message?.includes('duplicate key')) {
+        throw error
+      }
+    }
+
+    globalThis.console.log('memory collection indexes created')
+
     globalThis.console.log('All database indexes initialized successfully')
   }
   catch (error: any) {
@@ -201,6 +217,7 @@ export async function initializeMongoDB() {
     keyCol = db.collection<KeyConfig>('key_config')
     userPromptCol = db.collection<UserPrompt>('user_prompt')
     redeemCol = db.collection<GiftCard>('giftcards')
+    memoryCol = db.collection<MemoryInfo>('memory')
 
     // Initialize indexes
     await initializeIndexes()
@@ -1246,4 +1263,55 @@ export async function clearUserPrompt(userId: string) {
 
 export async function importUserPrompt(userPromptList: UserPrompt[]) {
   await userPromptCol.insertMany(userPromptList)
+}
+
+export async function getUserMemory(userId: string): Promise<MemoryInfo> {
+  const memory = await memoryCol.findOne({ userId })
+  return memory || new MemoryInfo(userId)
+}
+
+export async function upsertUserMemoryFile(userId: string, file: MemoryFile, content: string): Promise<MemoryInfo> {
+  const normalized = String(content || '').trim()
+  const now = new Date().toISOString()
+  const updatedAtField = file === 'summary' ? 'summaryUpdatedAt' : 'profileUpdatedAt'
+  const update = {
+    $set: {
+      userId,
+      [file]: normalized,
+      [updatedAtField]: normalized ? now : null,
+      updateTime: now,
+    },
+    $setOnInsert: {
+      createTime: now,
+    },
+  }
+
+  await memoryCol.updateOne({ userId }, update, { upsert: true })
+  return await getUserMemory(userId)
+}
+
+export async function clearUserMemoryFile(userId: string, file: MemoryFile): Promise<MemoryInfo> {
+  return await upsertUserMemoryFile(userId, file, '')
+}
+
+export async function clearUserMemory(userId: string): Promise<MemoryInfo> {
+  const now = new Date().toISOString()
+  await memoryCol.updateOne(
+    { userId },
+    {
+      $set: {
+        userId,
+        summary: '',
+        profile: '',
+        summaryUpdatedAt: null,
+        profileUpdatedAt: null,
+        updateTime: now,
+      },
+      $setOnInsert: {
+        createTime: now,
+      },
+    },
+    { upsert: true },
+  )
+  return await getUserMemory(userId)
 }

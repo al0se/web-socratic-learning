@@ -490,6 +490,7 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
                     capability: room?.title || 'chat',
                     language: containsChinese(prompt) ? 'zh' : 'en',
                     user,
+                    userId,
                     chatModel: room?.chatModel || model,
                   })
                 }

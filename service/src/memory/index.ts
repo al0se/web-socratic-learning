@@ -1,26 +1,19 @@
 import type { ClientOptions } from 'openai'
 import type { RequestInit } from 'undici'
-import type { ChatInfo, ChatRoom, KeyConfig, UserInfo } from '../storage/model'
-import fs from 'node:fs'
-import path from 'node:path'
+import type { ChatInfo, ChatRoom, KeyConfig, MemoryFile, MemoryInfo, UserInfo } from '../storage/model'
 import process from 'node:process'
 import OpenAI from 'openai'
 import * as undici from 'undici'
 import { getCacheApiKeys, getCacheConfig } from '../storage/config'
 import { Status } from '../storage/model'
-import { getChatRoom, getChatRooms, getChats } from '../storage/mongo'
+import { clearUserMemory, clearUserMemoryFile, getChatRoom, getChatRooms, getChats, getUserMemory, upsertUserMemoryFile } from '../storage/mongo'
 import { hasAnyRole, isNotEmptyString } from '../utils/is'
 
-export type MemoryFile = 'summary' | 'profile'
+export type { MemoryFile } from '../storage/model'
 
 export const MEMORY_FILES: MemoryFile[] = ['summary', 'profile']
 
 const NO_CHANGE = 'NO_CHANGE'
-
-const FILENAMES: Record<MemoryFile, string> = {
-  summary: 'SUMMARY.md',
-  profile: 'PROFILE.md',
-}
 
 export interface MemorySnapshot {
   summary: string
@@ -54,124 +47,56 @@ interface ResolvedMemoryKey {
 }
 
 export class MemoryService {
-  private readonly memoryDir: string
-
-  constructor(memoryDir = resolveMemoryDir()) {
-    this.memoryDir = memoryDir
-    this.migrateLegacy()
-  }
-
-  private path(which: MemoryFile): string {
-    return path.join(this.memoryDir, FILENAMES[which])
-  }
-
-  private migrateLegacy(): void {
-    const legacy = path.join(this.memoryDir, 'memory.md')
-    if (!fs.existsSync(legacy))
-      return
-    if (fs.existsSync(this.path('profile')) || fs.existsSync(this.path('summary')))
-      return
-
-    const content = safeReadFile(legacy).trim()
-    if (!content) {
-      fs.renameSync(legacy, `${legacy}.bak`)
-      return
-    }
-
-    const [preferences, context] = extractLegacySections(content)
-    fs.mkdirSync(this.memoryDir, { recursive: true })
-    if (preferences) {
-      fs.writeFileSync(
-        this.path('profile'),
-        `## Preferences\n${preferences}`,
-        'utf8',
-      )
-    }
-    if (context) {
-      fs.writeFileSync(
-        this.path('summary'),
-        `## Learning Journey\n${context}`,
-        'utf8',
-      )
-    }
-    fs.renameSync(legacy, `${legacy}.bak`)
-  }
-
-  readFile(which: MemoryFile): string {
-    return safeReadFile(this.path(which)).trim()
-  }
-
-  readSummary(): string {
-    return this.readFile('summary')
-  }
-
-  readProfile(): string {
-    return this.readFile('profile')
-  }
-
-  private fileUpdatedAt(which: MemoryFile): string | null {
-    const filePath = this.path(which)
-    if (!fs.existsSync(filePath))
-      return null
-
-    try {
-      return fs.statSync(filePath).mtime.toISOString()
-    }
-    catch {
-      return null
-    }
-  }
-
-  readSnapshot(): MemorySnapshot {
+  private toSnapshot(memory: MemoryInfo): MemorySnapshot {
     return {
-      summary: this.readSummary(),
-      profile: this.readProfile(),
-      summary_updated_at: this.fileUpdatedAt('summary'),
-      profile_updated_at: this.fileUpdatedAt('profile'),
+      summary: memory.summary || '',
+      profile: memory.profile || '',
+      summary_updated_at: memory.summaryUpdatedAt || null,
+      profile_updated_at: memory.profileUpdatedAt || null,
     }
   }
 
-  writeFile(which: MemoryFile, content: string): MemorySnapshot {
-    const normalized = String(content || '').trim()
-    const filePath = this.path(which)
-    fs.mkdirSync(path.dirname(filePath), { recursive: true })
-
-    if (!normalized) {
-      if (fs.existsSync(filePath))
-        fs.unlinkSync(filePath)
-    }
-    else {
-      fs.writeFileSync(filePath, normalized, 'utf8')
-    }
-
-    return this.readSnapshot()
+  async readFile(userId: string, which: MemoryFile): Promise<string> {
+    const memory = await getUserMemory(userId)
+    return String(memory[which] || '').trim()
   }
 
-  writeMemory(content: string): MemorySnapshot {
-    return this.writeFile('profile', content)
+  async readSummary(userId: string): Promise<string> {
+    return await this.readFile(userId, 'summary')
   }
 
-  clearFile(which: MemoryFile): MemorySnapshot {
-    return this.writeFile(which, '')
+  async readProfile(userId: string): Promise<string> {
+    return await this.readFile(userId, 'profile')
   }
 
-  clearMemory(): MemorySnapshot {
-    for (const file of MEMORY_FILES) {
-      const filePath = this.path(file)
-      if (fs.existsSync(filePath))
-        fs.unlinkSync(filePath)
-    }
-    return this.readSnapshot()
+  async readSnapshot(userId: string): Promise<MemorySnapshot> {
+    return this.toSnapshot(await getUserMemory(userId))
   }
 
-  buildMemoryContext(maxChars = 4000): string {
+  async writeFile(userId: string, which: MemoryFile, content: string): Promise<MemorySnapshot> {
+    return this.toSnapshot(await upsertUserMemoryFile(userId, which, content))
+  }
+
+  async writeMemory(userId: string, content: string): Promise<MemorySnapshot> {
+    return await this.writeFile(userId, 'profile', content)
+  }
+
+  async clearFile(userId: string, which: MemoryFile): Promise<MemorySnapshot> {
+    return this.toSnapshot(await clearUserMemoryFile(userId, which))
+  }
+
+  async clearMemory(userId: string): Promise<MemorySnapshot> {
+    return this.toSnapshot(await clearUserMemory(userId))
+  }
+
+  async buildMemoryContext(userId: string, maxChars = 4000): Promise<string> {
     const parts: string[] = []
 
-    const profile = this.readProfile()
+    const profile = await this.readProfile(userId)
     if (profile)
       parts.push(`### User Profile\n${profile}`)
 
-    const summary = this.readSummary()
+    const summary = await this.readSummary(userId)
     if (summary)
       parts.push(`### Learning Context\n${summary}`)
 
@@ -190,8 +115,8 @@ export class MemoryService {
     ].join('\n')
   }
 
-  getPreferencesText(): string {
-    const profile = this.readProfile()
+  async getPreferencesText(userId: string): Promise<string> {
+    const profile = await this.readProfile(userId)
     return profile ? `## User Profile\n${profile}` : ''
   }
 
@@ -203,8 +128,10 @@ export class MemoryService {
     language?: string
     timestamp?: string
     user?: UserInfo
+    userId?: string
     chatModel?: string
   }): Promise<MemoryUpdateResult> {
+    const userId = resolveMemoryUserId(options.userId, options.user)
     const userMessage = options.userMessage.trim()
     const assistantMessage = options.assistantMessage.trim()
     if (!userMessage || !assistantMessage)
@@ -224,10 +151,10 @@ export class MemoryService {
       chatModel: options.chatModel,
       user: options.user,
     }
-    const profileChanged = await this.rewriteOne('profile', source, options.language || 'en', rewriteOptions)
-    const summaryChanged = await this.rewriteOne('summary', source, options.language || 'en', rewriteOptions)
+    const profileChanged = await this.rewriteOne(userId, 'profile', source, options.language || 'en', rewriteOptions)
+    const summaryChanged = await this.rewriteOne(userId, 'summary', source, options.language || 'en', rewriteOptions)
 
-    const snapshot = this.readSnapshot()
+    const snapshot = await this.readSnapshot(userId)
     return {
       content: snapshot.profile,
       changed: profileChanged || summaryChanged,
@@ -239,7 +166,8 @@ export class MemoryService {
     sessionId?: string | null,
     options: MemoryRefreshOptions = {},
   ): Promise<MemoryUpdateResult> {
-    const targetRoom = await resolveTargetRoom(sessionId, options.userId)
+    const userId = resolveMemoryUserId(options.userId, options.user)
+    const targetRoom = await resolveTargetRoom(sessionId, userId)
     if (!targetRoom)
       return { content: '', changed: false, updated_at: null }
 
@@ -263,10 +191,10 @@ export class MemoryService {
       chatModel: options.chatModel || targetRoom.chatModel,
       user: options.user,
     }
-    const profileChanged = await this.rewriteOne('profile', source, options.language || 'en', rewriteOptions)
-    const summaryChanged = await this.rewriteOne('summary', source, options.language || 'en', rewriteOptions)
+    const profileChanged = await this.rewriteOne(userId, 'profile', source, options.language || 'en', rewriteOptions)
+    const summaryChanged = await this.rewriteOne(userId, 'summary', source, options.language || 'en', rewriteOptions)
 
-    const snapshot = this.readSnapshot()
+    const snapshot = await this.readSnapshot(userId)
     return {
       content: snapshot.profile,
       changed: profileChanged || summaryChanged,
@@ -275,12 +203,13 @@ export class MemoryService {
   }
 
   private async rewriteOne(
+    userId: string,
     which: MemoryFile,
     source: string,
     language: string,
     options: RewriteLlmOptions,
   ): Promise<boolean> {
-    const current = this.readFile(which)
+    const current = await this.readFile(userId, which)
     const zh = language.toLowerCase().startsWith('zh')
     const [systemPrompt, userPrompt] = which === 'profile'
       ? profilePrompts(current, source, zh)
@@ -292,50 +221,16 @@ export class MemoryService {
     if (raw === current)
       return false
 
-    this.writeFile(which, raw)
+    await this.writeFile(userId, which, raw)
     return true
   }
 }
 
-function resolveMemoryDir(): string {
-  const cwd = process.cwd()
-  if (path.basename(cwd).toLowerCase() === 'service')
-    return path.resolve(cwd, '..', 'data')
-  return path.resolve(cwd, 'data')
-}
-
-function safeReadFile(filePath: string): string {
-  try {
-    if (!fs.existsSync(filePath))
-      return ''
-    return fs.readFileSync(filePath, 'utf8')
-  }
-  catch {
-    return ''
-  }
-}
-
-function extractLegacySections(content: string): [string, string] {
-  const text = content.replace(/\r\n/g, '\n').trim()
-  const sections = new Map<string, string[]>()
-  let currentSection = ''
-
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('## ')) {
-      currentSection = trimmed.slice(3).trim().toLowerCase()
-      sections.set(currentSection, [])
-      continue
-    }
-
-    if (currentSection)
-      sections.get(currentSection)?.push(line)
-  }
-
-  return [
-    sections.get('preferences')?.join('\n').trim() || '',
-    sections.get('context')?.join('\n').trim() || '',
-  ]
+function resolveMemoryUserId(userId?: string, user?: UserInfo): string {
+  const resolved = String(userId || user?._id || '').trim()
+  if (!resolved)
+    throw new Error('Missing user id for memory')
+  return resolved
 }
 
 function stripCodeFence(content: string): string {

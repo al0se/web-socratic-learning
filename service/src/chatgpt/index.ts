@@ -225,7 +225,7 @@ async function chatReplyProcess(options: RequestOptions) {
 
   const { message, uploadFileKeys, parentMessageId, previousResponseId, tools, process, chatUuid } = options
   const systemMessage = isNotEmptyString(options.room.prompt) ? options.room.prompt : DEFAULT_ROOM_PROMPT
-  const memoryContext = getMemoryService().buildMemoryContext()
+  const memoryContext = await getMemoryService().buildMemoryContext(userId)
   let instructions = combineInstructions(systemMessage, memoryContext)
 
   try {

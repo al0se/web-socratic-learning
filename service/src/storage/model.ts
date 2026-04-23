@@ -126,6 +126,30 @@ export class SearchResult {
   content: string
 }
 
+export type MemoryFile = 'summary' | 'profile'
+
+export class MemoryInfo {
+  _id: ObjectId
+  userId: string
+  summary: string
+  profile: string
+  summaryUpdatedAt: string | null
+  profileUpdatedAt: string | null
+  createTime: string
+  updateTime: string
+
+  constructor(userId: string) {
+    const now = new Date().toISOString()
+    this.userId = userId
+    this.summary = ''
+    this.profile = ''
+    this.summaryUpdatedAt = null
+    this.profileUpdatedAt = null
+    this.createTime = now
+    this.updateTime = now
+  }
+}
+
 export type KnowledgeGraphStatus = 'hit' | 'miss' | 'error'
 
 export class ChatInfo {

@@ -40,13 +40,13 @@ const hasUnsavedChanges = computed(() => {
 const memoryStats = computed(() => [
   {
     key: 'summary',
-    label: 'SUMMARY.md',
+    label: 'Learning summary',
     description: t('memory.summaryDescription'),
     updatedAt: snapshot.value.summary_updated_at,
   },
   {
     key: 'profile',
-    label: 'PROFILE.md',
+    label: 'Learner profile',
     description: t('memory.profileDescription'),
     updatedAt: snapshot.value.profile_updated_at,
   },
@@ -200,8 +200,8 @@ onMounted(loadMemory)
             <div class="rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] p-4 shadow-sm sm:p-5">
               <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <NTabs v-model:value="activeFile" type="segment" animated class="sm:max-w-[360px]">
-                  <NTabPane name="summary" tab="SUMMARY.md" />
-                  <NTabPane name="profile" tab="PROFILE.md" />
+                  <NTabPane name="summary" tab="Learning summary" />
+                  <NTabPane name="profile" tab="Learner profile" />
                 </NTabs>
 
                 <div class="flex flex-wrap gap-2">
