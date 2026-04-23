@@ -55,6 +55,8 @@
   "memory": {
     "title": "Memory",
     "description": "View and edit the long-term memory stored in the database. Learner profile stores stable traits and preferences; learning summary stores the learning journey.",
+    "summaryLabel": "Learning summary",
+    "profileLabel": "Learner profile",
     "summaryDescription": "Learning journey, current focus, accomplishments, and open questions.",
     "profileDescription": "Stable identity, learning style, knowledge level, and preferences.",
     "reload": "Reload",
