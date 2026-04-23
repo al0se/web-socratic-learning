@@ -1577,7 +1577,7 @@ onUnmounted(() => {
                     <template #icon>
                       <IconRiStopCircleLine />
                     </template>
-                    Stop Responding
+                    {{ t('chat.stopResponding') }}
                   </NButton>
                 </div>
               </div>

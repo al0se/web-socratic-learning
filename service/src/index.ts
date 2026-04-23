@@ -9,6 +9,7 @@ import { ObjectId } from 'mongodb'
 import speakeasy from 'speakeasy'
 import { chatConfig, containsSensitiveWords, initAuditService } from './chatgpt'
 import { normalizeKnowledgeGraphQuery, runKnowledgeGraphQuery } from './lightrag'
+import { router as memoryRouter } from './memory/router'
 import { auth, getUserId } from './middleware/auth'
 import { authLimiter } from './middleware/limiter'
 import { isAdmin, rootAuth } from './middleware/rootAuth'
@@ -1141,6 +1142,9 @@ app.use('/api', roomRouter)
 
 app.use('', uploadRouter)
 app.use('/api', uploadRouter)
+
+app.use('', memoryRouter)
+app.use('/api', memoryRouter)
 
 app.use('', router)
 app.use('/api', router)

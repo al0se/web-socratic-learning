@@ -115,14 +115,14 @@ function isActive(uuid: number) {
             <div
               v-for="{ item, index } in group.items"
               :key="item.roomId"
-              class="group flex cursor-pointer items-center gap-2 rounded-r-lg py-1 pl-3 pr-2 transition-colors"
+              class="group flex cursor-pointer items-center gap-2.5 rounded-r-lg py-1.5 pl-3 pr-2 transition-colors"
               :class="isActive(item.roomId)
                 ? 'bg-[var(--dt-primary-soft)] text-[var(--dt-primary)]'
                 : 'text-[var(--dt-muted-foreground)] hover:bg-[var(--dt-background)]/40 hover:text-[var(--dt-foreground)]'"
               @click="handleSelect(item)"
             >
               <span
-                class="block h-1.5 w-1.5 shrink-0 rounded-full"
+                class="block h-2 w-2 shrink-0 rounded-full"
                 :class="isActive(item.roomId) ? 'bg-[var(--dt-primary)]' : 'bg-[var(--dt-muted-foreground)]/25'"
               />
               <NInput
@@ -133,35 +133,35 @@ function isActive(uuid: number) {
                 @click.stop
                 @keydown.enter.stop="handleEdit(item, false)"
               />
-              <span v-else class="min-w-0 flex-1 truncate text-[13px]" :class="{ 'font-medium': isActive(item.roomId) }">
+              <span v-else class="min-w-0 flex-1 truncate text-[14px] leading-5" :class="{ 'font-medium': isActive(item.roomId) }">
                 {{ item.title || t('sidebar.untitledChat') }}
               </span>
-              <div class="flex shrink-0 items-center gap-px opacity-0 transition-opacity group-hover:opacity-100" :class="{ 'opacity-100': isActive(item.roomId) }">
+              <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100" :class="{ 'opacity-100': isActive(item.roomId) }">
                 <template v-if="item.isEdit">
                   <button
-                    class="rounded p-0.5 text-[var(--dt-muted-foreground)] hover:text-[var(--dt-foreground)]"
+                    class="rounded p-1 text-[var(--dt-muted-foreground)] hover:text-[var(--dt-foreground)]"
                     :aria-label="t('common.save')"
                     @click.stop="handleEdit(item, false)"
                   >
-                    <IconRiSaveLine class="text-[10px]" />
+                    <IconRiSaveLine class="text-xs" />
                   </button>
                 </template>
                 <template v-else>
                   <button
-                    class="rounded p-0.5 text-[var(--dt-muted-foreground)] hover:text-[var(--dt-foreground)]"
+                    class="rounded p-1 text-[var(--dt-muted-foreground)] hover:text-[var(--dt-foreground)]"
                     :aria-label="t('common.edit')"
                     @click.stop="handleEdit(item, true)"
                   >
-                    <IconRiEditLine class="text-[10px]" />
+                    <IconRiEditLine class="text-xs" />
                   </button>
                   <NPopconfirm placement="bottom" @positive-click="handleDeleteDebounce(index, $event)">
                     <template #trigger>
                       <button
-                        class="rounded p-0.5 text-[var(--dt-muted-foreground)] hover:text-[var(--dt-destructive)]"
+                        class="rounded p-1 text-[var(--dt-muted-foreground)] hover:text-[var(--dt-destructive)]"
                         :aria-label="t('common.delete')"
                         @click.stop
                       >
-                        <IconRiDeleteBinLine class="text-[10px]" />
+                        <IconRiDeleteBinLine class="text-xs" />
                       </button>
                     </template>
                     {{ t('chat.deleteHistoryConfirm') }}

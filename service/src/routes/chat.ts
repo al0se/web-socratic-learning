@@ -6,6 +6,7 @@ import * as process from 'node:process'
 import Router from 'express'
 import { ObjectId } from 'mongodb'
 import { abortChatProcess, chatReplyProcess, containsSensitiveWords } from '../chatgpt'
+import { getMemoryService } from '../memory'
 import { auth } from '../middleware/auth'
 import { limiter } from '../middleware/limiter'
 import { getCacheConfig } from '../storage/config'
@@ -479,6 +480,23 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
                 if (userId !== '6406d8c50aedd633885fa16f' && user && user.useAmount && user.limit_switch)
                   await updateAmountMinusOne(userId)
               }
+
+              if (!regenerate && result.data.text?.trim()) {
+                try {
+                  await getMemoryService().refreshFromTurn({
+                    userMessage: prompt,
+                    assistantMessage: result.data.text,
+                    sessionId: String(roomId),
+                    capability: room?.title || 'chat',
+                    language: containsChinese(prompt) ? 'zh' : 'en',
+                    user,
+                    chatModel: room?.chatModel || model,
+                  })
+                }
+                catch (memoryError) {
+                  globalThis.console.error('Failed to refresh memory:', memoryError)
+                }
+              }
             }
             // If result.data === undefined, do nothing.
           }
@@ -491,6 +509,10 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
     }
   }
 })
+
+function containsChinese(text: string): boolean {
+  return /[\u4E00-\u9FFF]/.test(text)
+}
 
 router.post('/chat-abort', [auth, limiter], async (req, res) => {
   try {

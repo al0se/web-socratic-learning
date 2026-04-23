@@ -2,6 +2,21 @@ import type { AnnounceConfig, AuditConfig, ConfigState, GiftCard, KeyConfig, Kno
 import { get, post } from '@/utils/request'
 import fetchService from '@/utils/request/fetchService'
 
+export type MemoryFile = 'summary' | 'profile'
+
+export interface MemorySnapshot {
+  summary: string
+  profile: string
+  summary_updated_at: string | null
+  profile_updated_at: string | null
+}
+
+export interface MemoryResponse extends MemorySnapshot {
+  saved?: boolean
+  changed?: boolean
+  cleared?: boolean
+}
+
 export function fetchAnnouncement<T = any>() {
   return post<T>({
     url: '/announcement',
@@ -11,6 +26,33 @@ export function fetchAnnouncement<T = any>() {
 export function fetchChatConfig<T = any>() {
   return post<T>({
     url: '/config',
+  })
+}
+
+export function fetchMemory<T = MemorySnapshot>() {
+  return get<T>({
+    url: '/memory',
+  })
+}
+
+export function fetchUpdateMemory<T = MemoryResponse>(file: MemoryFile, content: string) {
+  return post<T>({
+    url: '/memory',
+    data: { file, content },
+  })
+}
+
+export function fetchRefreshMemory<T = MemoryResponse>(roomId?: number | string, language = 'en') {
+  return post<T>({
+    url: '/memory/refresh',
+    data: { roomId, language },
+  })
+}
+
+export function fetchClearMemory<T = MemoryResponse>(file?: MemoryFile) {
+  return post<T>({
+    url: '/memory/clear',
+    data: file ? { file } : {},
   })
 }
 

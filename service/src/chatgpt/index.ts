@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import OpenAI from 'openai'
 import * as undici from 'undici'
 import { normalizeKnowledgeGraphQuery, runKnowledgeGraphQuery } from '../lightrag'
+import { getMemoryService } from '../memory'
 import { getCacheApiKeys, getCacheConfig, getOriginConfig } from '../storage/config'
 import { Status, UsageResponse } from '../storage/model'
 import { getChatByMessageId, updateChatKnowledgeGraphQuery, updateChatKnowledgeGraphResult, updateChatSearchQuery, updateChatSearchResult } from '../storage/mongo'
@@ -28,7 +29,28 @@ function renderSystemMessage(template: string | undefined, currentTime: string, 
 function combineInstructions(baseInstruction: string, extraInstruction: string): string {
   if (!isNotEmptyString(extraInstruction))
     return baseInstruction
+  if (!isNotEmptyString(baseInstruction))
+    return extraInstruction
   return `${baseInstruction}\n\n${extraInstruction}`
+}
+
+function setSystemInstruction(
+  messages: Array<OpenAI.Chat.ChatCompletionMessageParam | OpenAI.Responses.ResponseInputItem>,
+  instruction: string,
+): void {
+  if (!isNotEmptyString(instruction))
+    return
+
+  const firstMessage = messages[0] as OpenAI.Chat.ChatCompletionMessageParam | undefined
+  if (firstMessage?.role === 'system') {
+    firstMessage.content = instruction
+    return
+  }
+
+  messages.unshift({
+    role: 'system',
+    content: instruction,
+  } as OpenAI.Chat.ChatCompletionMessageParam)
 }
 
 async function getTaggedAuxiliaryQuery(
@@ -203,7 +225,8 @@ async function chatReplyProcess(options: RequestOptions) {
 
   const { message, uploadFileKeys, parentMessageId, previousResponseId, tools, process, chatUuid } = options
   const systemMessage = isNotEmptyString(options.room.prompt) ? options.room.prompt : DEFAULT_ROOM_PROMPT
-  let instructions = systemMessage
+  const memoryContext = getMemoryService().buildMemoryContext()
+  let instructions = combineInstructions(systemMessage, memoryContext)
 
   try {
     // Initialize OpenAI client
@@ -230,11 +253,11 @@ async function chatReplyProcess(options: RequestOptions) {
       } as OpenAI.Responses.ResponseInputItem)
     }
     else {
-      // Add system message if provided
-      if (isNotEmptyString(systemMessage)) {
+      // Add system and memory instructions if provided.
+      if (isNotEmptyString(instructions)) {
         messages.unshift({
           role: 'system',
-          content: systemMessage,
+          content: instructions,
         })
       }
 
@@ -249,8 +272,6 @@ async function chatReplyProcess(options: RequestOptions) {
     }
 
     const retrievalMessages = [...messages]
-    let hasSearchResult = false
-    let hasKnowledgeGraphResult = false
     const searchConfig = globalConfig.searchConfig
     const knowledgeGraphConfig = globalConfig.knowledgeGraphConfig
     const knowledgeGraphEnabled = !!options.room.knowledgeGraphEnabled
@@ -320,7 +341,6 @@ search result: <search_result>${searchResultContent}</search_result>`,
 
           const searchResultInstruction = renderSystemMessage(searchConfig.systemMessageWithSearchResult, currentTime, DEFAULT_SEARCH_RESULT_SYSTEM_MESSAGE)
           instructions = combineInstructions(instructions, searchResultInstruction)
-          hasSearchResult = true
         }
         else {
           // Search query is empty, indicating this question doesn't need search, close search box
@@ -372,7 +392,6 @@ search result: <search_result>${searchResultContent}</search_result>`,
           if (knowledgeGraphOutput.status === 'hit') {
             const knowledgeGraphInstruction = renderSystemMessage(DEFAULT_KNOWLEDGE_GRAPH_RESULT_SYSTEM_MESSAGE, currentTime)
             instructions = combineInstructions(instructions, `${knowledgeGraphInstruction}\n\n${knowledgeGraphOutput.prompt}`)
-            hasKnowledgeGraphResult = true
           }
         }
         else {
@@ -393,7 +412,7 @@ search result: <search_result>${searchResultContent}</search_result>`,
     }
 
     if (key.keyModel !== 'ResponsesAPI')
-      (messages as OpenAI.Chat.ChatCompletionMessageParam[])[0].content = hasSearchResult || hasKnowledgeGraphResult ? instructions : systemMessage
+      setSystemInstruction(messages, instructions)
 
     // Send generating status before starting to generate response
     process?.({
