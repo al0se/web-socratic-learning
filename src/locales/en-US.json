@@ -35,6 +35,23 @@
     "invalid": "Invalid",
     "invalidFileFormat": "Invalid file format"
   },
+  "sidebar": {
+    "newChat": "New Chat",
+    "chat": "Chat",
+    "knowledge": "Knowledge",
+    "memory": "Memory",
+    "catHome": "Cat home",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "last7Days": "Last 7 days",
+    "earlier": "Earlier",
+    "untitledChat": "Untitled chat",
+    "knowledgePlaceholder": "Knowledge base UI is reserved for the next frontend step.",
+    "memoryPlaceholder": "Memory UI is reserved for the next frontend step.",
+    "frontendOnly": "Frontend placeholder, pending backend integration."
+  },
   "chat": {
     "newChatButton": "New Chat",
     "placeholder": "Ask me anything...(Shift + Enter = line break)",

@@ -35,6 +35,23 @@
     "invalid": "无效",
     "invalidFileFormat": "文件格式不正确"
   },
+  "sidebar": {
+    "newChat": "新对话",
+    "chat": "聊天",
+    "knowledge": "知识库",
+    "memory": "记忆",
+    "catHome": "小猫首页",
+    "collapse": "收起侧栏",
+    "expand": "展开侧栏",
+    "today": "今天",
+    "yesterday": "昨天",
+    "last7Days": "最近 7 天",
+    "earlier": "更早",
+    "untitledChat": "未命名对话",
+    "knowledgePlaceholder": "知识库前端页面已预留，后续接入具体功能。",
+    "memoryPlaceholder": "记忆前端页面已预留，后续接入具体功能。",
+    "frontendOnly": "当前为前端占位，等待后端功能接入。"
+  },
   "chat": {
     "newChatButton": "新建聊天",
     "placeholder": "来说点什么吧...（Shift + Enter = 换行）",

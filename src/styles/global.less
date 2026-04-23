@@ -4,7 +4,33 @@ body,
 	height: 100%;
 }
 
+:root {
+	--dt-background: #FFFFFF;
+	--dt-foreground: #1F2937;
+	--dt-secondary: #FFFFFF;
+	--dt-muted: #F3F4F6;
+	--dt-muted-foreground: #6B7280;
+	--dt-border: #E5E7EB;
+	--dt-primary: #4B9E5F;
+	--dt-primary-soft: rgba(75, 158, 95, 0.12);
+	--dt-destructive: #C53A2C;
+}
+
+.dark {
+	--dt-background: #24272E;
+	--dt-foreground: #F9FAFB;
+	--dt-secondary: #202329;
+	--dt-muted: #2F333B;
+	--dt-muted-foreground: #A1A1AA;
+	--dt-border: #3F444D;
+	--dt-primary: #63B876;
+	--dt-primary-soft: rgba(99, 184, 118, 0.16);
+	--dt-destructive: #D44A3C;
+}
+
 body {
 	padding-bottom: constant(safe-area-inset-bottom);
 	padding-bottom: env(safe-area-inset-bottom);
+	background: var(--dt-background);
+	color: var(--dt-foreground);
 }

@@ -3,10 +3,7 @@ import type { Language } from '@/store/modules/app/helper'
 import { createI18n } from 'vue-i18n'
 import { useAppStoreWithOut } from '@/store/modules/app'
 import enUS from './en-US.json'
-import jaJP from './ja-JP.json'
-import koKR from './ko-KR.json'
 import zhCN from './zh-CN.json'
-import zhTW from './zh-TW.json'
 
 const appStore = useAppStoreWithOut()
 
@@ -22,10 +19,7 @@ const i18n = createI18n<[MessageSchema], Language>({
   fallbackLocale: 'en-US',
   messages: {
     'en-US': enUS,
-    'ja-JP': jaJP as MessageSchema,
     'zh-CN': zhCN as MessageSchema,
-    'zh-TW': zhTW as MessageSchema,
-    'ko-KR': koKR as MessageSchema,
   },
 })
 

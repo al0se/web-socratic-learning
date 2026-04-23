@@ -54,17 +54,19 @@ onMounted(async () => {
           v-html="userInfo.description"
         />
       </p>
-      <NButton
-        v-else tag="a" text
+      <button
+        v-else
+        type="button"
+        class="group flex min-w-0 rounded-lg px-3 py-2 text-left text-[13.5px] font-medium text-[var(--dt-primary)] transition-colors hover:bg-[var(--dt-primary-soft)]"
         @click="showPermission = true"
       >
-        <span v-if="!!authStore.session?.auth && !authStore.token" class="text-xl text-[#ff69b4] dark:text-white">
+        <span v-if="!!authStore.session?.auth && !authStore.token" class="truncate">
           {{ t('common.notLoggedIn') }}
         </span>
-        <span v-else class="text-xl text-[#ff69b4] dark:text-white">
-          {{ authStore .session?.title }}
+        <span v-else class="truncate">
+          {{ authStore.session?.title }}
         </span>
-      </NButton>
+      </button>
     </div>
     <Permission :visible="needPermission" @update:visible="(newValue) => showPermission = newValue" />
   </div>

@@ -12,11 +12,14 @@ declare global {
   const IconMdiFormatVerticalAlignBottom: typeof import('~icons/mdi/format-vertical-align-bottom').default
   const IconMdiFormatVerticalAlignTop: typeof import('~icons/mdi/format-vertical-align-top').default
   const IconMdiReorderHorizontal: typeof import('~icons/mdi/reorder-horizontal').default
+  const IconRiBookOpenLine: typeof import('~icons/ri/book-open-line').default
+  const IconRiBrainLine: typeof import('~icons/ri/brain-line').default
   const IconRiContrastLine: typeof import('~icons/ri/contrast-line').default
   const IconRiDeleteBinLine: typeof import('~icons/ri/delete-bin-line').default
   const IconRiEdit2Line: typeof import('~icons/ri/edit2-line').default
   const IconRiExternalLinkLine: typeof import('~icons/ri/external-link-line').default
   const IconRiFileCopy2Line: typeof import('~icons/ri/file-copy2-line').default
+  const IconRiMessage3Line: typeof import('~icons/ri/message3-line').default
   const IconRiMoonFoggyLine: typeof import('~icons/ri/moon-foggy-line').default
   const IconRiSunFoggyLine: typeof import('~icons/ri/sun-foggy-line').default
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
