@@ -32,6 +32,9 @@ export const useChatStore = defineStore('chat-store', () => {
   const findRoomIndex = (roomId: number | null) => state.chatRooms.findIndex(item => item.roomId === roomId)
   const findChatIndex = (roomId: number) => state.chat.findIndex(item => item.roomId === roomId)
   const getCurrentUuid = (uuid?: number) => uuid || state.active || state.chat[0]?.roomId
+  const sortChatRooms = (rooms: Chat.ChatRoom[]) => {
+    return [...rooms].sort((a, b) => b.roomId - a.roomId)
+  }
 
   // Getters
   const getChatRoomByCurrentActive = computed(() =>
@@ -72,18 +75,13 @@ export const useChatStore = defineStore('chat-store', () => {
   }
 
   const syncHistory = async () => {
-    const rooms = (await fetchGetChatRooms()).data
+    const rooms = sortChatRooms((await fetchGetChatRooms()).data)
     if (rooms.length === 0) {
       return await addNewChatRoom()
     }
 
-    state.chatRooms = []
-    state.chat = []
-
-    rooms.forEach((r: Chat.ChatRoom) => {
-      state.chatRooms.unshift(r)
-      state.chat.unshift({ roomId: r.roomId, data: [] })
-    })
+    state.chatRooms = rooms
+    state.chat = rooms.map((room: Chat.ChatRoom) => ({ roomId: room.roomId, data: [] }))
     if (!rooms.find((item: Chat.ChatRoom) => item.roomId === state.active)) {
       state.active = state.chatRooms[0].roomId
       await reloadRoute(state.active!)
@@ -212,6 +210,18 @@ export const useChatStore = defineStore('chat-store', () => {
     return await reloadRoute(roomId)
   }
 
+  const openLatestChat = async () => {
+    if (state.chatRooms.length === 0)
+      await syncHistory()
+
+    const latestRoomId = state.chatRooms[0]?.roomId
+    if (!latestRoomId)
+      return await reloadRoute()
+
+    state.active = latestRoomId
+    return await reloadRoute(latestRoomId)
+  }
+
   const getChatByUuidAndIndex = (uuid: number, index: number) => {
     const targetUuid = getCurrentUuid(uuid)
     const chatIndex = findChatIndex(targetUuid)
@@ -285,6 +295,7 @@ export const useChatStore = defineStore('chat-store', () => {
     addNewChatRoom,
     deleteChatRoom,
     setActive,
+    openLatestChat,
     getChatByUuidAndIndex,
     addChatMessage,
     updateChatMessage,

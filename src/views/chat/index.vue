@@ -33,10 +33,16 @@ const { isMobile } = useBasicLayout()
 const { updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
 const { scrollRef, scrollToBottom, scrollToBottomIfAtBottom, scrollTo } = useScroll()
 
-const { uuid } = route.params as { uuid: string }
+const routeRoomId = computed(() => {
+  const parsed = Number(route.params.uuid)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+})
+const activeRoomId = computed(() => {
+  return routeRoomId.value || chatStore.active || chatStore.chatRooms[0]?.roomId || null
+})
 
 const currentChatRoom = computed(() => chatStore.getChatRoomByCurrentActive)
-const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
+const dataSources = computed(() => chatStore.getChatByUuid(activeRoomId.value || undefined))
 const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
 
 const prompt = ref<string>('')
@@ -182,8 +188,8 @@ let prevScrollTop: number
 
 // Reset loading manually; it may not reset on page refresh.
 dataSources.value.forEach((item, index) => {
-  if (item.loading)
-    updateChatSome(+uuid, index, { loading: false })
+  if (item.loading && activeRoomId.value)
+    updateChatSome(activeRoomId.value, index, { loading: false })
 })
 
 function handleSubmit() {
@@ -1154,8 +1160,14 @@ async function loadMoreMessage(event: any) {
 const handleLoadMoreMessage = debounce(loadMoreMessage, 300)
 const handleSyncChat
   = debounce(() => {
+    const roomId = activeRoomId.value
+    if (!roomId) {
+      firstLoading.value = false
+      return
+    }
+
     // Direct refresh may skip requests in rare cases.
-    chatStore.syncChat({ roomId: Number(uuid) } as Chat.ChatRoom, undefined, () => {
+    chatStore.syncChat({ roomId } as Chat.ChatRoom, undefined, () => {
       firstLoading.value = false
       // Initialize lastToolResponseId from history.
       initLastToolResponseId()
@@ -1495,6 +1507,11 @@ onMounted(() => {
 
 watch(() => chatStore.active, () => {
   handleSyncChat()
+})
+
+watch(routeRoomId, (roomId) => {
+  if (roomId && chatStore.active !== roomId)
+    chatStore.active = roomId
 })
 
 watch(

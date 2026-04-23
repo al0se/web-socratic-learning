@@ -55,6 +55,12 @@ async function handleNavigate(to: RouteLocationRaw) {
     appStore.setSiderCollapsed(true)
 }
 
+async function handleCatHome() {
+  await chatStore.openLatestChat()
+  if (isMobile.value)
+    appStore.setSiderCollapsed(true)
+}
+
 function handleUpdateCollapsed() {
   appStore.setSiderCollapsed(!collapsed.value)
 }
@@ -159,7 +165,7 @@ onMounted(async () => {
             <button
               class="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition-opacity duration-150 group-hover/sb:opacity-0"
               :aria-label="t('sidebar.catHome')"
-              @click="handleNavigate({ path: '/chat' })"
+              @click="handleCatHome"
             >
               🐱
             </button>
@@ -209,7 +215,7 @@ onMounted(async () => {
 
       <template v-else>
         <div class="flex h-14 items-center justify-between px-4">
-          <button class="group flex min-w-0 items-center gap-2" @click="handleNavigate({ path: '/chat' })">
+          <button class="group flex min-w-0 items-center gap-2" @click="handleCatHome">
             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl transition-transform duration-200 group-hover:scale-105">
               🐱
             </span>

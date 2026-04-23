@@ -61,6 +61,7 @@
     "profileDescription": "Stable identity, learning style, knowledge level, and preferences.",
     "reload": "Reload",
     "refreshFromChat": "Refresh from chat",
+    "refreshDelayTip": "Refreshing may take a moment. Please wait.",
     "refreshChanged": "Memory refreshed",
     "refreshNoChange": "No memory changes",
     "clearCurrent": "Clear current",

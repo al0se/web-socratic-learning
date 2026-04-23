@@ -22,6 +22,16 @@ const drafts = reactive<Record<MemoryFile, string>>({
   profile: '',
 })
 
+const memoryHeadingTranslations: Record<string, string> = {
+  'Current Focus': '当前重点',
+  'Accomplishments': '已完成内容',
+  'Open Questions': '待解决问题',
+  'Identity': '身份信息',
+  'Learning Style': '学习风格',
+  'Knowledge Level': '知识水平',
+  'Preferences': '偏好',
+}
+
 const activeContent = computed({
   get: () => drafts[activeFile.value],
   set: value => drafts[activeFile.value] = value,
@@ -57,10 +67,25 @@ const previewLines = computed(() => {
   return content ? content.split('\n') : []
 })
 
+function localizeMemoryHeadings(content: string) {
+  return content.split('\n').map((line) => {
+    if (!line.startsWith('## '))
+      return line
+    const heading = line.slice(3).trim()
+    const translated = memoryHeadingTranslations[heading]
+    return translated ? `## ${translated}` : line
+  }).join('\n')
+}
+
 function applySnapshot(next: MemorySnapshot) {
-  snapshot.value = next
-  drafts.summary = next.summary || ''
-  drafts.profile = next.profile || ''
+  const localized = {
+    ...next,
+    summary: localizeMemoryHeadings(next.summary || ''),
+    profile: localizeMemoryHeadings(next.profile || ''),
+  }
+  snapshot.value = localized
+  drafts.summary = localized.summary
+  drafts.profile = localized.profile
 }
 
 async function loadMemory() {
@@ -139,10 +164,7 @@ onMounted(loadMemory)
         <header class="overflow-hidden rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] p-6 shadow-sm">
           <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p class="text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--dt-muted-foreground)]">
-                DeepTutor Memory
-              </p>
-              <h1 class="mt-2 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+              <h1 class="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
                 {{ t('memory.title') }}
               </h1>
               <p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--dt-muted-foreground)]">
@@ -157,12 +179,17 @@ onMounted(loadMemory)
                 </template>
                 {{ t('memory.reload') }}
               </NButton>
-              <NButton type="primary" :loading="refreshing" @click="refreshMemory">
-                <template #icon>
-                  <IconRiSparkling2Line />
+              <NTooltip trigger="hover">
+                <template #trigger>
+                  <NButton type="primary" :loading="refreshing" @click="refreshMemory">
+                    <template #icon>
+                      <IconRiSparkling2Line />
+                    </template>
+                    {{ t('memory.refreshFromChat') }}
+                  </NButton>
                 </template>
-                {{ t('memory.refreshFromChat') }}
-              </NButton>
+                {{ t('memory.refreshDelayTip') }}
+              </NTooltip>
             </div>
           </div>
         </header>
@@ -190,14 +217,15 @@ onMounted(loadMemory)
               <IconRiFileList3Line v-else class="text-2xl text-[var(--dt-primary)]" />
             </div>
             <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-[var(--dt-muted-foreground)]">
+              {{ t('memory.updatedAt') }}
               <span>{{ formatTime(item.updatedAt) }}</span>
             </div>
           </button>
         </div>
 
         <NSpin :show="loading">
-          <section class="grid min-h-[560px] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
-            <div class="rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] p-4 shadow-sm sm:p-5">
+          <section class="grid min-h-[560px] gap-4 lg:grid-cols-[minmax(360px,0.75fr)_minmax(0,1fr)]">
+            <div class="order-2 rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] p-4 shadow-sm sm:p-5">
               <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <NTabs v-model:value="activeFile" type="segment" animated class="sm:max-w-[360px]">
                   <NTabPane name="summary" :tab="t('memory.summaryLabel')" />
@@ -242,7 +270,7 @@ onMounted(loadMemory)
               />
             </div>
 
-            <aside class="rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] p-5 shadow-sm">
+            <aside class="order-1 rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] p-5 shadow-sm">
               <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <p class="text-sm font-semibold">

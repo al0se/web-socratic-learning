@@ -61,6 +61,7 @@
     "profileDescription": "稳定身份、学习风格、知识水平和偏好。",
     "reload": "重新加载",
     "refreshFromChat": "从对话刷新",
+    "refreshDelayTip": "更新存在延时，请耐心等待~",
     "refreshChanged": "记忆已刷新",
     "refreshNoChange": "记忆无需更新",
     "clearCurrent": "清空当前",
