@@ -77,6 +77,116 @@
     "summaryPlaceholder": "在这里记录当前学习重点、已完成内容和待解决问题...",
     "profilePlaceholder": "在这里记录稳定的学习者特征、偏好和知识水平..."
   },
+  "knowledge": {
+    "title": "知识库",
+    "frontendOnly": "仅前端原型",
+    "cancel": "取消",
+    "tabs": {
+      "knowledge": "知识库",
+      "notebooks": "笔记本",
+      "questions": "题目笔记",
+      "skills": "技能"
+    },
+    "stats": {
+      "knowledgeBases": "知识库",
+      "notebooks": "笔记本",
+      "questions": "题目卡片",
+      "skills": "技能"
+    },
+    "listTitle": "知识库列表",
+    "listDescription": "浏览当前知识库卡片，并查看对应的前端状态。",
+    "searchPlaceholder": "搜索知识库",
+    "noKnowledgeBases": "当前还没有知识库。",
+    "default": "默认",
+    "setDefault": "设为默认",
+    "updatedAt": "更新时间",
+    "files": "文件",
+    "documents": "文档",
+    "chunks": "切片",
+    "createTitle": "新建知识库",
+    "createDescription": "复刻 DeepTutor 的创建流程，但只保留前端界面和本地状态交互。",
+    "nameLabel": "名称",
+    "namePlaceholder": "例如：线性代数期中复习",
+    "providerLabel": "RAG 提供器",
+    "filesLabel": "模拟文件",
+    "filesPlaceholder": "每行一个文件名",
+    "createButton": "创建知识库",
+    "uploadTitle": "上传到已有知识库",
+    "uploadDescription": "将文件追加到目标知识库，并在本地刷新它的统计信息。",
+    "uploadTargetLabel": "上传目标",
+    "uploadButton": "上传模拟文件",
+    "mockHint": "这个页面复刻了 DeepTutor 的工作流，但所有操作都只停留在前端状态，不会调用后端。",
+    "status": {
+      "ready": "就绪",
+      "indexing": "索引中",
+      "draft": "草稿"
+    },
+    "providers": {
+      "llamaindex": "纯向量检索，索引速度更快。",
+      "vectorlite": "适合体量较小课程包的轻量本地检索。",
+      "hybrid": "结合关键词与语义召回的混合检索。"
+    },
+    "messages": {
+      "created": "已创建知识库卡片。",
+      "uploaded": "已向当前知识库添加模拟文件。",
+      "deleted": "已删除知识库。",
+      "defaultChanged": "已更新默认知识库。",
+      "notebookCreated": "已创建笔记本。",
+      "notebookDeleted": "已删除笔记本。",
+      "recordDeleted": "已删除笔记记录。",
+      "categoryCreated": "已新增分类。",
+      "categoryCleared": "已从题目笔记中清空该分类。",
+      "questionDeleted": "已删除题目。",
+      "skillCreated": "已创建技能。",
+      "skillUpdated": "已更新技能。",
+      "skillDeleted": "已删除技能。"
+    },
+    "notebooks": {
+      "title": "笔记本",
+      "description": "收纳结构化笔记、自动总结和可复用的学习材料。",
+      "createTitle": "新建笔记本",
+      "namePlaceholder": "笔记本名称",
+      "descriptionPlaceholder": "这个笔记本主要收纳什么内容？",
+      "recordCount": "条记录",
+      "selectNotebook": "请选择一个笔记本",
+      "noRecords": "当前笔记本还没有记录。",
+      "expand": "展开",
+      "collapse": "收起"
+    },
+    "questions": {
+      "title": "题目笔记",
+      "description": "按筛选器和分类回看已保存题目，复刻 DeepTutor 的错题回顾工作区。",
+      "filters": {
+        "all": "全部",
+        "bookmarked": "已收藏",
+        "wrong": "仅错题"
+      },
+      "categories": "分类",
+      "allCategories": "全部分类",
+      "newCategoryPlaceholder": "新增分类",
+      "addCategory": "添加分类",
+      "noQuestions": "当前筛选条件下没有题目。",
+      "yourAnswer": "你的答案",
+      "referenceAnswer": "参考答案",
+      "explanation": "解析",
+      "removeCategory": "移除分类",
+      "bookmark": "收藏",
+      "bookmarked": "已收藏",
+      "correct": "正确",
+      "incorrect": "待复习"
+    },
+    "skills": {
+      "title": "技能",
+      "description": "用于塑造 Agent 行为的短型说明卡，这里按当前项目的视觉体系展示。",
+      "newSkill": "新建技能",
+      "noSkills": "当前还没有技能。",
+      "editSkill": "编辑技能",
+      "namePlaceholder": "例如：exam-coach",
+      "descriptionPlaceholder": "简述这个技能适合在哪类场景下使用。",
+      "bodyLabel": "Markdown 内容",
+      "bodyPlaceholder": "# Skill\n\n在这里描述行为..."
+    }
+  },
   "chat": {
     "newChatButton": "新建聊天",
     "placeholder": "来说点什么吧...（Shift + Enter = 换行）",

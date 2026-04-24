@@ -77,6 +77,116 @@
     "summaryPlaceholder": "Write the current focus, accomplishments, and open questions here...",
     "profilePlaceholder": "Write stable learner traits, preferences, and knowledge levels here..."
   },
+  "knowledge": {
+    "title": "Knowledge",
+    "frontendOnly": "Frontend-only prototype",
+    "cancel": "Cancel",
+    "tabs": {
+      "knowledge": "Knowledge Bases",
+      "notebooks": "Notebooks",
+      "questions": "Question Notebook",
+      "skills": "Skills"
+    },
+    "stats": {
+      "knowledgeBases": "Knowledge bases",
+      "notebooks": "Notebooks",
+      "questions": "Question cards",
+      "skills": "Skills"
+    },
+    "listTitle": "Library",
+    "listDescription": "Browse available knowledge bases and inspect their frontend states.",
+    "searchPlaceholder": "Search knowledge bases",
+    "noKnowledgeBases": "No knowledge bases yet.",
+    "default": "Default",
+    "setDefault": "Set as default",
+    "updatedAt": "Updated",
+    "files": "Files",
+    "documents": "Documents",
+    "chunks": "Chunks",
+    "createTitle": "Create knowledge base",
+    "createDescription": "Simulate the create flow used in DeepTutor while keeping this page frontend-only.",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. Linear Algebra Midterm",
+    "providerLabel": "RAG provider",
+    "filesLabel": "Mock files",
+    "filesPlaceholder": "One file per line",
+    "createButton": "Create knowledge base",
+    "uploadTitle": "Upload to existing base",
+    "uploadDescription": "Append files to the selected base and refresh its stats locally.",
+    "uploadTargetLabel": "Upload target",
+    "uploadButton": "Upload mock files",
+    "mockHint": "This screen mirrors DeepTutor's workflow, but all changes stay in local frontend state.",
+    "status": {
+      "ready": "Ready",
+      "indexing": "Indexing",
+      "draft": "Draft"
+    },
+    "providers": {
+      "llamaindex": "Pure vector retrieval with fast indexing.",
+      "vectorlite": "Lightweight local retrieval for smaller course packs.",
+      "hybrid": "Hybrid retrieval with keyword and semantic mixing."
+    },
+    "messages": {
+      "created": "Knowledge base card created.",
+      "uploaded": "Mock files added to the selected knowledge base.",
+      "deleted": "Knowledge base removed.",
+      "defaultChanged": "Default knowledge base updated.",
+      "notebookCreated": "Notebook created.",
+      "notebookDeleted": "Notebook removed.",
+      "recordDeleted": "Notebook record removed.",
+      "categoryCreated": "Category added.",
+      "categoryCleared": "Category cleared from the notebook.",
+      "questionDeleted": "Question removed.",
+      "skillCreated": "Skill created.",
+      "skillUpdated": "Skill updated.",
+      "skillDeleted": "Skill removed."
+    },
+    "notebooks": {
+      "title": "Notebooks",
+      "description": "Collect structured notes, generated summaries, and reusable study material.",
+      "createTitle": "New notebook",
+      "namePlaceholder": "Notebook name",
+      "descriptionPlaceholder": "What does this notebook collect?",
+      "recordCount": "records",
+      "selectNotebook": "Select a notebook",
+      "noRecords": "No notebook records yet.",
+      "expand": "Expand",
+      "collapse": "Collapse"
+    },
+    "questions": {
+      "title": "Question notebook",
+      "description": "Review saved questions by filter and category, similar to DeepTutor's question-review workspace.",
+      "filters": {
+        "all": "All",
+        "bookmarked": "Bookmarked",
+        "wrong": "Wrong only"
+      },
+      "categories": "Categories",
+      "allCategories": "All categories",
+      "newCategoryPlaceholder": "Add a category",
+      "addCategory": "Add category",
+      "noQuestions": "No questions match the current filter.",
+      "yourAnswer": "Your answer",
+      "referenceAnswer": "Reference answer",
+      "explanation": "Explanation",
+      "removeCategory": "Remove category",
+      "bookmark": "Bookmark",
+      "bookmarked": "Bookmarked",
+      "correct": "Correct",
+      "incorrect": "Needs review"
+    },
+    "skills": {
+      "title": "Skills",
+      "description": "Short playbooks that shape agent behavior, shown here in the current UI system.",
+      "newSkill": "New skill",
+      "noSkills": "No skills yet.",
+      "editSkill": "Edit skill",
+      "namePlaceholder": "e.g. exam-coach",
+      "descriptionPlaceholder": "Short summary for when this skill should be used.",
+      "bodyLabel": "Markdown body",
+      "bodyPlaceholder": "# Skill\n\nDescribe the behavior..."
+    }
+  },
   "chat": {
     "newChatButton": "New Chat",
     "placeholder": "Ask me anything...(Shift + Enter = line break)",
