@@ -49,6 +49,7 @@ const prompt = ref<string>('')
 const firstLoading = ref<boolean>(false)
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
+const mobileSettingsExpanded = ref(false)
 
 const loadingChatUuid = ref<number>(-1)
 
@@ -1624,31 +1625,6 @@ onUnmounted(() => {
             </NSpace>
           </div>
 
-          <div
-            v-if="isMobile"
-            class="grid grid-cols-1 justify-items-center gap-[clamp(0.125rem,1vw,0.5rem)]"
-          >
-            <HoverButton
-              class="w-full flex justify-center"
-              :class="{ 'text-[#2f9e44]': currentChatRoom?.searchEnabled, 'text-[#c92a2a]': !currentChatRoom?.searchEnabled }"
-              @click="handleToggleSearchEnabled"
-            >
-              <span class="w-full text-[11px] flex items-center justify-center gap-[clamp(0.125rem,0.6vw,0.375rem)] text-center leading-tight">
-                <IconMdiWeb class="text-[12px]" />
-                <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.searchEnabled ? t('chat.searchEnabled') : t('chat.searchDisabled') }}</span>
-              </span>
-            </HoverButton>
-            <HoverButton
-              class="w-full flex justify-center"
-              :class="{ 'text-[#2f9e44]': currentChatRoom?.knowledgeGraphEnabled, 'text-[#c92a2a]': !currentChatRoom?.knowledgeGraphEnabled }"
-              @click="handleToggleKnowledgeGraphEnabled"
-            >
-              <span class="w-full text-[11px] flex items-center justify-center gap-[clamp(0.125rem,0.6vw,0.375rem)] text-center leading-tight">
-                <IconRiShareForwardBoxLine class="text-[12px]" />
-                <span class="text-[11px] font-semibold tracking-tight">{{ currentChatRoom?.knowledgeGraphEnabled ? t('chat.knowledgeGraphEnabled') : t('chat.knowledgeGraphDisabled') }}</span>
-              </span>
-            </HoverButton>
-          </div>
           <div class="flex items-center" :class="[isMobile ? 'flex-wrap gap-2' : 'space-x-2']">
             <div v-if="currentChatRoom">
               <NUpload
@@ -1679,7 +1655,28 @@ onUnmounted(() => {
                 <IconRiDownload2Line />
               </span>
             </HoverButton>
+            <button
+              v-if="isMobile"
+              type="button"
+              class="flex h-10 flex-1 items-center justify-between rounded-lg border border-[#d9dce3] bg-white px-3 text-left text-[#4f555e] transition hover:bg-neutral-50 dark:border-[#414755] dark:bg-[#2f3440] dark:text-white dark:hover:bg-[#414755]"
+              :aria-expanded="mobileSettingsExpanded"
+              aria-controls="mobile-chat-settings"
+              @click="mobileSettingsExpanded = !mobileSettingsExpanded"
+            >
+              <span class="flex min-w-0 items-center gap-2 text-sm font-medium">
+                <IconRiSettings4Line class="shrink-0 text-lg" />
+                <span>{{ t('setting.setting') }}</span>
+              </span>
+              <span class="flex min-w-0 items-center gap-2 text-xs text-[#6f7782] dark:text-[#c2c8d1]">
+                <span class="max-w-[42vw] truncate">{{ currentChatRoom?.chatModel }}</span>
+                <IconRiArrowDownSLine
+                  class="shrink-0 text-lg transition-transform duration-200"
+                  :class="{ 'rotate-180': mobileSettingsExpanded }"
+                />
+              </span>
+            </button>
             <NSelect
+              v-if="!isMobile"
               :style="{ width: isMobile ? '100%' : '250px' }"
               :value="currentChatRoom?.chatModel"
               :options="chatModelOptions"
@@ -1711,6 +1708,42 @@ onUnmounted(() => {
                 <span class="text-xs font-bold tracking-wide">{{ currentChatRoom?.knowledgeGraphEnabled ? t('chat.knowledgeGraphEnabled') : t('chat.knowledgeGraphDisabled') }}</span>
               </span>
             </HoverButton>
+          </div>
+          <div
+            v-if="isMobile"
+            v-show="mobileSettingsExpanded"
+            id="mobile-chat-settings"
+            class="rounded-xl border border-[#e5e7eb] bg-white/95 p-2 shadow-sm dark:border-[#414755] dark:bg-[#2f3440]"
+          >
+            <NSelect
+              class="mb-2"
+              :style="{ width: '100%' }"
+              :value="currentChatRoom?.chatModel"
+              :options="chatModelOptions"
+              :disabled="!!authStore.session?.auth && !authStore.token && !authStore.session?.authProxyEnabled"
+              :render-label="renderChatModelLabel"
+              @update:value="handleSyncChatModel"
+            />
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                class="flex h-10 items-center justify-center gap-1 rounded-lg border border-[#e5e7eb] px-2 text-xs font-semibold transition hover:bg-neutral-50 dark:border-[#414755] dark:hover:bg-[#414755]"
+                :class="{ 'text-[#2f9e44]': currentChatRoom?.searchEnabled, 'text-[#c92a2a]': !currentChatRoom?.searchEnabled }"
+                @click="handleToggleSearchEnabled"
+              >
+                <IconMdiWeb class="text-base" />
+                <span class="truncate">{{ currentChatRoom?.searchEnabled ? t('chat.searchEnabled') : t('chat.searchDisabled') }}</span>
+              </button>
+              <button
+                type="button"
+                class="flex h-10 items-center justify-center gap-1 rounded-lg border border-[#e5e7eb] px-2 text-xs font-semibold transition hover:bg-neutral-50 dark:border-[#414755] dark:hover:bg-[#414755]"
+                :class="{ 'text-[#2f9e44]': currentChatRoom?.knowledgeGraphEnabled, 'text-[#c92a2a]': !currentChatRoom?.knowledgeGraphEnabled }"
+                @click="handleToggleKnowledgeGraphEnabled"
+              >
+                <IconRiShareForwardBoxLine class="text-base" />
+                <span class="truncate">{{ currentChatRoom?.knowledgeGraphEnabled ? t('chat.knowledgeGraphEnabled') : t('chat.knowledgeGraphDisabled') }}</span>
+              </button>
+            </div>
           </div>
           <div class="flex items-center justify-between space-x-2">
             <NInput
