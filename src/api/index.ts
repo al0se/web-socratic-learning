@@ -17,6 +17,18 @@ export interface MemoryResponse extends MemorySnapshot {
   cleared?: boolean
 }
 
+export interface QuizAnswerHistoryItem {
+  roomId: number
+  chatUuid: number
+  questionId: string
+  questionIndex: number
+  selected: string | null
+  typed: string
+  submitted: boolean
+  isCorrect: boolean | null
+  updateTime?: number
+}
+
 export function fetchAnnouncement<T = any>() {
   return post<T>({
     url: '/announcement',
@@ -53,6 +65,19 @@ export function fetchClearMemory<T = MemoryResponse>(file?: MemoryFile) {
   return post<T>({
     url: '/memory/clear',
     data: file ? { file } : {},
+  })
+}
+
+export function fetchQuizAnswerHistory<T = QuizAnswerHistoryItem[]>(roomId: number, chatUuid: number) {
+  return get<T>({
+    url: `/quiz-answer-history?roomId=${roomId}&chatUuid=${chatUuid}`,
+  })
+}
+
+export function fetchSaveQuizAnswerHistory<T = any>(payload: Omit<QuizAnswerHistoryItem, 'updateTime'>) {
+  return post<T>({
+    url: '/quiz-answer-history',
+    data: payload,
   })
 }
 

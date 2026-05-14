@@ -18,6 +18,8 @@ const appStore = useAppStore()
 interface Props {
   index: number
   currentNavIndex: number
+  roomId?: number
+  chatUuid?: number
   dateTime?: string
   model?: string
   searching?: boolean
@@ -270,6 +272,8 @@ function isEventTargetValid(event: any) {
           :text="text"
           :images="images"
           :tool-images="toolImages"
+          :room-id="roomId"
+          :chat-uuid="chatUuid"
           :client-mode="clientMode"
           :quiz-config="quizConfig"
           :loading="loading"

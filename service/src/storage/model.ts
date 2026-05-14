@@ -246,6 +246,46 @@ export class ChatUsage {
   }
 }
 
+export class QuizAnswerHistory {
+  _id: ObjectId
+  userId: string
+  roomId: number
+  chatUuid: number
+  questionId: string
+  questionIndex: number
+  selected?: string | null
+  typed: string
+  submitted: boolean
+  isCorrect?: boolean | null
+  createTime: number
+  updateTime: number
+
+  constructor(
+    userId: string,
+    roomId: number,
+    chatUuid: number,
+    questionId: string,
+    questionIndex: number,
+    selected?: string | null,
+    typed = '',
+    submitted = false,
+    isCorrect?: boolean | null,
+  ) {
+    const now = new Date().getTime()
+    this.userId = userId
+    this.roomId = roomId
+    this.chatUuid = chatUuid
+    this.questionId = questionId
+    this.questionIndex = questionIndex
+    this.selected = selected ?? null
+    this.typed = typed
+    this.submitted = submitted
+    this.isCorrect = isCorrect ?? null
+    this.createTime = now
+    this.updateTime = now
+  }
+}
+
 export class SearchConfig {
   public enabled: boolean
   public provider?: SearchServiceProvider

@@ -18,7 +18,7 @@ import { DEFAULT_ROOM_PROMPT } from '../utils'
 import { hasAnyRole } from '../utils/is'
 import { md5 } from '../utils/security'
 import { getCacheApiKeys, getCacheConfig } from './config'
-import { ChatInfo, ChatRoom, ChatUsage, MemoryInfo, Status, UserConfig, UserInfo, UserRole } from './model'
+import { ChatInfo, ChatRoom, ChatUsage, MemoryInfo, QuizAnswerHistory, Status, UserConfig, UserInfo, UserRole } from './model'
 
 let client: MongoClient
 let dbName: string
@@ -34,6 +34,7 @@ let keyCol: Collection<KeyConfig>
 let userPromptCol: Collection<UserPrompt>
 let redeemCol: Collection<GiftCard>
 let memoryCol: Collection<MemoryInfo>
+let quizAnswerCol: Collection<QuizAnswerHistory>
 
 /**
  * Initialize all database indexes
@@ -174,6 +175,20 @@ async function initializeIndexes() {
 
     globalThis.console.log('memory collection indexes created')
 
+    // ============================================
+    // quiz_answer_history collection indexes
+    // ============================================
+    await quizAnswerCol.createIndex(
+      { userId: 1, roomId: 1, chatUuid: 1 },
+      { name: 'idx_userId_roomId_chatUuid' },
+    )
+    await quizAnswerCol.createIndex(
+      { userId: 1, roomId: 1, chatUuid: 1, questionId: 1, questionIndex: 1 },
+      { name: 'uidx_quiz_answer', unique: true },
+    )
+
+    globalThis.console.log('quiz_answer_history collection indexes created')
+
     globalThis.console.log('All database indexes initialized successfully')
   }
   catch (error: any) {
@@ -218,6 +233,7 @@ export async function initializeMongoDB() {
     userPromptCol = db.collection<UserPrompt>('user_prompt')
     redeemCol = db.collection<GiftCard>('giftcards')
     memoryCol = db.collection<MemoryInfo>('memory')
+    quizAnswerCol = db.collection<QuizAnswerHistory>('quiz_answer_history')
 
     // Initialize indexes
     await initializeIndexes()
@@ -390,6 +406,60 @@ export async function insertChatUsage(userId: ObjectId, roomId: number, chatId: 
   const chatUsage = new ChatUsage(userId, roomId, chatId, messageId, model, usage, imageUsage)
   await usageCol.insertOne(chatUsage)
   return chatUsage
+}
+
+export async function getQuizAnswerHistory(userId: string, roomId: number, chatUuid: number) {
+  return await quizAnswerCol
+    .find({ userId, roomId, chatUuid })
+    .sort({ questionIndex: 1 })
+    .toArray()
+}
+
+export async function upsertQuizAnswerHistory(
+  userId: string,
+  roomId: number,
+  chatUuid: number,
+  questionId: string,
+  questionIndex: number,
+  selected: string | null,
+  typed: string,
+  submitted: boolean,
+  isCorrect: boolean | null,
+) {
+  const now = new Date().getTime()
+  const answer = new QuizAnswerHistory(
+    userId,
+    roomId,
+    chatUuid,
+    questionId,
+    questionIndex,
+    selected,
+    typed,
+    submitted,
+    isCorrect,
+  )
+
+  await quizAnswerCol.updateOne(
+    { userId, roomId, chatUuid, questionId, questionIndex },
+    {
+      $set: {
+        selected: answer.selected,
+        typed: answer.typed,
+        submitted: answer.submitted,
+        isCorrect: answer.isCorrect,
+        updateTime: now,
+      },
+      $setOnInsert: {
+        userId,
+        roomId,
+        chatUuid,
+        questionId,
+        questionIndex,
+        createTime: now,
+      },
+    },
+    { upsert: true },
+  )
 }
 
 export async function createChatRoom(
@@ -726,6 +796,7 @@ export async function clearChat(roomId: number) {
     },
   }
   await chatCol.updateMany(query, update)
+  await quizAnswerCol.deleteMany({ roomId })
 }
 
 export async function deleteChat(roomId: number, uuid: number, inversion: boolean) {
@@ -753,6 +824,7 @@ export async function deleteChat(roomId: number, uuid: number, inversion: boolea
     }
   }
   await chatCol.updateOne(query, update)
+  await quizAnswerCol.deleteMany({ roomId, chatUuid: uuid })
 }
 
 // Add useAmount and limit_switch in createUser/updateUserInfo.

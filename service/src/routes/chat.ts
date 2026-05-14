@@ -19,11 +19,13 @@ import {
   getChat,
   getChatRoom,
   getChats,
+  getQuizAnswerHistory,
   getUserById,
   insertChat,
   insertChatUsage,
   updateAmountMinusOne,
   updateChat,
+  upsertQuizAnswerHistory,
 } from '../storage/mongo'
 import { isNotEmptyString } from '../utils/is'
 
@@ -204,6 +206,87 @@ router.get('/chat-response-history', auth, async (req, res) => {
   catch (error) {
     console.error(error)
     res.send({ status: 'Fail', message: 'Load error', data: null })
+  }
+})
+
+router.get('/quiz-answer-history', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const roomId = +req.query.roomId
+    const chatUuid = +req.query.chatUuid
+
+    if (!roomId || !chatUuid || !await existsChatRoom(userId, roomId)) {
+      res.send({ status: 'Success', message: null, data: [] })
+      return
+    }
+
+    const records = await getQuizAnswerHistory(userId, roomId, chatUuid)
+    res.send({
+      status: 'Success',
+      message: null,
+      data: records.map(record => ({
+        roomId: record.roomId,
+        chatUuid: record.chatUuid,
+        questionId: record.questionId,
+        questionIndex: record.questionIndex,
+        selected: record.selected ?? null,
+        typed: record.typed || '',
+        submitted: !!record.submitted,
+        isCorrect: record.isCorrect ?? null,
+        updateTime: record.updateTime,
+      })),
+    })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Load error', data: [] })
+  }
+})
+
+router.post('/quiz-answer-history', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const {
+      roomId,
+      chatUuid,
+      questionId,
+      questionIndex,
+      selected = null,
+      typed = '',
+      submitted = false,
+      isCorrect = null,
+    } = req.body as {
+      roomId: number
+      chatUuid: number
+      questionId: string
+      questionIndex: number
+      selected?: string | null
+      typed?: string
+      submitted?: boolean
+      isCorrect?: boolean | null
+    }
+
+    if (!roomId || !chatUuid || !questionId || !Number.isFinite(questionIndex) || !await existsChatRoom(userId, roomId)) {
+      res.send({ status: 'Fail', message: 'Invalid quiz answer', data: null })
+      return
+    }
+
+    await upsertQuizAnswerHistory(
+      userId,
+      Number(roomId),
+      Number(chatUuid),
+      String(questionId),
+      Number(questionIndex),
+      selected === null || selected === undefined ? null : String(selected),
+      String(typed || ''),
+      !!submitted,
+      isCorrect === null || isCorrect === undefined ? null : !!isCorrect,
+    )
+    res.send({ status: 'Success', message: null, data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Save error', data: null })
   }
 })
 

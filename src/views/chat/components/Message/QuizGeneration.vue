@@ -7,6 +7,8 @@ const props = defineProps<{
   text?: string
   loading?: boolean
   quizConfig?: QuizConfig
+  roomId?: number
+  chatUuid?: number
 }>()
 
 const { t } = useI18n()
@@ -60,7 +62,12 @@ const stageRows = computed(() => {
       </div>
     </div>
 
-    <QuizViewer v-if="questions" :questions="questions" />
+    <QuizViewer
+      v-if="questions"
+      :questions="questions"
+      :room-id="roomId"
+      :chat-uuid="chatUuid"
+    />
 
     <div
       v-else-if="showFormatWarning"

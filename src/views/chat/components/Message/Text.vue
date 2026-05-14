@@ -18,6 +18,8 @@ interface Props {
   text?: string
   images?: string[]
   toolImages?: string[] // Local file names from AI-generated images (stored as local file names, e.g., "image-xxx.png")
+  roomId?: number
+  chatUuid?: number
   clientMode?: Chat.ClientMode
   quizConfig?: Chat.QuizConfig
   loading?: boolean
@@ -186,6 +188,8 @@ onUnmounted(() => {
           :text="props.text"
           :loading="loading"
           :quiz-config="quizConfig"
+          :room-id="roomId"
+          :chat-uuid="chatUuid"
         />
         <div v-else-if="!asRawText" class="w-full markdown-body" :class="{ 'markdown-body-generate': loading }" v-html="text" />
         <div v-else class="w-full whitespace-pre-wrap break-words" v-text="text" />

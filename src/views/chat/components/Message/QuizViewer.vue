@@ -3,6 +3,7 @@ import type { QuizQuestion } from '../../utils/quiz'
 import mdKatex from '@vscode/markdown-it-katex'
 import MarkdownIt from 'markdown-it'
 import mila from 'markdown-it-link-attributes'
+import { fetchQuizAnswerHistory, fetchSaveQuizAnswerHistory } from '@/api'
 import { quizTypeLabel } from '../../utils/quiz'
 
 interface AnswerState {
@@ -13,12 +14,15 @@ interface AnswerState {
 
 const props = defineProps<{
   questions: QuizQuestion[]
+  roomId?: number
+  chatUuid?: number
 }>()
 
 const { t } = useI18n()
 
 const currentIndex = ref(0)
 const answers = reactive<Record<number, AnswerState>>({})
+const saveTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
 const mdi = new MarkdownIt({
   html: false,
@@ -56,18 +60,23 @@ function ensureAnswer(index = currentIndex.value) {
 
 function setSelected(value: string) {
   ensureAnswer().selected = value
+  saveAnswer(currentIndex.value)
 }
 
 function setTyped(value: string) {
   ensureAnswer().typed = value
+  saveAnswer(currentIndex.value, 500)
 }
 
 function submitAnswer() {
-  ensureAnswer().submitted = true
+  const answer = ensureAnswer()
+  answer.submitted = true
+  saveAnswer(currentIndex.value)
 }
 
 function resetAnswer() {
   answers[currentIndex.value] = { selected: null, typed: '', submitted: false }
+  saveAnswer(currentIndex.value)
 }
 
 function getUserAnswer(question: QuizQuestion | undefined, answer: AnswerState) {
@@ -107,6 +116,90 @@ function optionClass(key: string) {
     return 'border-[#f87171] bg-[#fef2f2] text-[#991b1b] dark:border-[#b91c1c] dark:bg-[#450a0a] dark:text-[#fecaca]'
   return 'border-[#e5e7eb] bg-white text-[#1f2937] hover:border-[#2563eb]/30 hover:bg-[#eff6ff]/40 dark:border-[#414755] dark:bg-[#111827] dark:text-white dark:hover:border-[#60a5fa]/40'
 }
+
+function questionStorageKey(question: QuizQuestion, index: number) {
+  let hash = 0
+  for (let charIndex = 0; charIndex < question.question.length; charIndex += 1)
+    hash = Math.imul(31, hash) + question.question.charCodeAt(charIndex) | 0
+
+  return `${question.question_id || `q_${index + 1}`}:${Math.abs(hash).toString(36)}`
+}
+
+function clearAnswers() {
+  Object.keys(answers).forEach((key) => {
+    delete answers[Number(key)]
+  })
+}
+
+async function loadAnswers() {
+  clearAnswers()
+
+  if (!props.roomId || !props.chatUuid)
+    return
+
+  const response = await fetchQuizAnswerHistory(props.roomId, props.chatUuid)
+  const savedAnswers = response.data || []
+
+  props.questions.forEach((question, index) => {
+    const questionId = questionStorageKey(question, index)
+    const saved = savedAnswers.find(item =>
+      item.questionIndex === index && item.questionId === questionId,
+    )
+    if (saved) {
+      answers[index] = {
+        selected: saved.selected,
+        typed: saved.typed || '',
+        submitted: !!saved.submitted,
+      }
+    }
+  })
+}
+
+function saveAnswer(index: number, delay = 0) {
+  const existingTimer = saveTimers.get(index)
+  if (existingTimer)
+    clearTimeout(existingTimer)
+
+  const run = () => {
+    saveTimers.delete(index)
+
+    const question = props.questions[index]
+    const answer = answers[index]
+    if (!props.roomId || !props.chatUuid || !question || !answer)
+      return
+
+    void fetchSaveQuizAnswerHistory({
+      roomId: props.roomId,
+      chatUuid: props.chatUuid,
+      questionId: questionStorageKey(question, index),
+      questionIndex: index,
+      selected: answer.selected,
+      typed: answer.typed,
+      submitted: answer.submitted,
+      isCorrect: answer.submitted ? isAnswerCorrect(question, answer) : null,
+    })
+  }
+
+  if (delay > 0) {
+    saveTimers.set(index, setTimeout(run, delay))
+    return
+  }
+
+  run()
+}
+
+watch(
+  () => [props.roomId, props.chatUuid, props.questions.map(questionStorageKey).join('|')],
+  () => {
+    void loadAnswers()
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  saveTimers.forEach(timer => clearTimeout(timer))
+  saveTimers.clear()
+})
 </script>
 
 <template>
