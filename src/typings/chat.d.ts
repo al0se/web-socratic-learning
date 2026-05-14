@@ -60,6 +60,7 @@ declare namespace Chat {
     knowledgeGraphEnabled?: boolean
     toolsEnabled?: boolean
     imageUploadEnabled?: boolean
+    updatedAt?: number | null
   }
 
   interface ConversationRequest {

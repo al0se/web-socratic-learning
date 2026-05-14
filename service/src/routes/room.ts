@@ -41,6 +41,7 @@ router.get('/chatrooms', auth, async (req, res) => {
         knowledgeGraphEnabled: !!r.knowledgeGraphEnabled,
         toolsEnabled: !!r.toolsEnabled,
         imageUploadEnabled: !!r.imageUploadEnabled,
+        updatedAt: r.updatedAt ?? r.roomId,
       })
     })
     res.send({ status: 'Success', message: null, data: result })

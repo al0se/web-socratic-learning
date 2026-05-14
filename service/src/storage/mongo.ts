@@ -523,7 +523,54 @@ export async function updateRoomMaxContextCount(userId: string, roomId: number, 
 }
 
 export async function getChatRooms(userId: string) {
-  const cursor = roomCol.find({ userId, status: { $ne: Status.Deleted } })
+  const cursor = roomCol.aggregate([
+    {
+      $match: {
+        userId,
+        status: { $ne: Status.Deleted },
+      },
+    },
+    {
+      $lookup: {
+        from: 'chat',
+        let: { roomId: '$roomId' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$roomId', '$$roomId'] },
+                  { $ne: ['$status', Status.Deleted] },
+                ],
+              },
+            },
+          },
+          { $sort: { dateTime: -1 } },
+          { $limit: 1 },
+          { $project: { dateTime: 1 } },
+        ],
+        as: 'lastChat',
+      },
+    },
+    {
+      $addFields: {
+        updatedAt: {
+          $ifNull: [{ $arrayElemAt: ['$lastChat.dateTime', 0] }, '$roomId'],
+        },
+      },
+    },
+    {
+      $project: {
+        lastChat: 0,
+      },
+    },
+    {
+      $sort: {
+        updatedAt: -1,
+        roomId: -1,
+      },
+    },
+  ])
   const rooms = []
   for await (const doc of cursor)
     rooms.push(doc)

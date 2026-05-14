@@ -32,8 +32,14 @@ export const useChatStore = defineStore('chat-store', () => {
   const findRoomIndex = (roomId: number | null) => state.chatRooms.findIndex(item => item.roomId === roomId)
   const findChatIndex = (roomId: number) => state.chat.findIndex(item => item.roomId === roomId)
   const getCurrentUuid = (uuid?: number) => uuid || state.active || state.chat[0]?.roomId
+  const getRoomSortTime = (room: Chat.ChatRoom) => room.updatedAt ?? room.roomId
   const sortChatRooms = (rooms: Chat.ChatRoom[]) => {
-    return [...rooms].sort((a, b) => b.roomId - a.roomId)
+    return [...rooms].sort((a, b) => getRoomSortTime(b) - getRoomSortTime(a) || b.roomId - a.roomId)
+  }
+  const sortChatState = () => {
+    state.chatRooms = sortChatRooms(state.chatRooms)
+    const order = new Map(state.chatRooms.map((room, index) => [room.roomId, index]))
+    state.chat.sort((a, b) => (order.get(a.roomId) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.roomId) ?? Number.MAX_SAFE_INTEGER))
   }
 
   // Getters
@@ -67,6 +73,7 @@ export const useChatStore = defineStore('chat-store', () => {
       knowledgeGraphEnabled: result.data?.knowledgeGraphEnabled,
       toolsEnabled: result.data?.toolsEnabled,
       imageUploadEnabled: result.data?.imageUploadEnabled,
+      updatedAt: result.data?.updatedAt ?? roomId,
     })
 
     state.chat.unshift({ roomId, data: [] })
@@ -192,17 +199,20 @@ export const useChatStore = defineStore('chat-store', () => {
   }
 
   const deleteChatRoom = async (index: number) => {
-    await fetchDeleteChatRoom(state.chatRooms[index].roomId)
+    const roomId = state.chatRooms[index].roomId
+    await fetchDeleteChatRoom(roomId)
     state.chatRooms.splice(index, 1)
-    state.chat.splice(index, 1)
+    const chatIndex = findChatIndex(roomId)
+    if (chatIndex !== -1)
+      state.chat.splice(chatIndex, 1)
 
     if (state.chatRooms.length === 0)
       return await addNewChatRoom()
 
     const nextIndex = Math.min(index, state.chatRooms.length - 1)
-    const roomId = state.chatRooms[nextIndex].roomId
-    state.active = roomId
-    await reloadRoute(roomId)
+    const nextRoomId = state.chatRooms[nextIndex].roomId
+    state.active = nextRoomId
+    await reloadRoute(nextRoomId)
   }
 
   const setActive = async (roomId: number) => {
@@ -232,10 +242,17 @@ export const useChatStore = defineStore('chat-store', () => {
     const chatIndex = findChatIndex(roomId)
 
     state.chat[chatIndex].data.push(chatItem)
+    const roomIndex = findRoomIndex(roomId)
 
-    if (state.chatRooms[chatIndex]?.title === 'New Chat') {
-      state.chatRooms[chatIndex].title = chatItem.text
-      await fetchRenameChatRoom(chatItem.text, state.chatRooms[chatIndex].roomId)
+    if (roomIndex !== -1) {
+      state.chatRooms[roomIndex].updatedAt = Date.now()
+
+      if (state.chatRooms[roomIndex].title === 'New Chat') {
+        state.chatRooms[roomIndex].title = chatItem.text
+        await fetchRenameChatRoom(chatItem.text, state.chatRooms[roomIndex].roomId)
+      }
+
+      sortChatState()
     }
   }
 
