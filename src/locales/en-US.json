@@ -189,6 +189,43 @@
   },
   "chat": {
     "newChatButton": "New Chat",
+    "mode": {
+      "chat": "Chat",
+      "quiz": "Quiz Generation"
+    },
+    "quiz": {
+      "settings": "Quiz settings",
+      "custom": "Custom",
+      "questions": "questions",
+      "count": "Count",
+      "difficulty": "Difficulty",
+      "type": "Type",
+      "auto": "Auto",
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard",
+      "choice": "Multiple Choice",
+      "written": "Written",
+      "coding": "Coding",
+      "placeholder": "Enter the topic or knowledge points to generate questions...",
+      "answerPlaceholder": "Type your answer...",
+      "codePlaceholder": "Write your code here...",
+      "checkAnswer": "Check Answer",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "retry": "Retry",
+      "referenceAnswer": "Reference Answer",
+      "explanation": "Explanation",
+      "previous": "Previous",
+      "next": "Next",
+      "generating": "Generating questions...",
+      "formatWarning": "The quiz was generated, but the model did not return structured questions. Regenerate or switch to a more stable model.",
+      "stage": {
+        "retrieveKnowledge": "Retrieve knowledge (batch 1)",
+        "generateTemplates": "Generating templates (batch 1)",
+        "generateQuestion": "Generating question {index}"
+      }
+    },
     "placeholder": "Ask me anything...(Shift + Enter = line break)",
     "placeholderMobile": "Ask me anything...",
     "copy": "Copy",

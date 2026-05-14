@@ -51,6 +51,8 @@ export interface RequestOptions {
   parentMessageId?: string
   previousResponseId?: string
   tools?: Array<ImageGenerationTool>
+  clientMode?: 'chat' | 'quiz'
+  clientSystemInstruction?: string
   process?: (chunk: ResponseChunk) => void
   user: UserInfo
   messageId: string

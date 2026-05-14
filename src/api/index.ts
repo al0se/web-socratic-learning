@@ -85,6 +85,8 @@ export function fetchChatAPIProcessSSE(
     options?: { conversationId?: string, parentMessageId?: string }
     tools?: Array<Chat.ImageGenerationTool>
     previousResponseId?: string
+    clientMode?: Chat.ClientMode
+    quizConfig?: Chat.QuizConfig
     signal?: AbortSignal
   },
   handlers: SSEEventHandlers,
@@ -103,6 +105,12 @@ export function fetchChatAPIProcessSSE(
   }
   if (params.previousResponseId) {
     data.previousResponseId = params.previousResponseId
+  }
+  if (params.clientMode) {
+    data.clientMode = params.clientMode
+  }
+  if (params.quizConfig) {
+    data.quizConfig = params.quizConfig
   }
 
   return new Promise((resolve, reject) => {

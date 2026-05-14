@@ -37,7 +37,7 @@ declare namespace Chat {
     error?: boolean
     loading?: boolean
     conversationOptions?: ConversationRequest | null
-    requestOptions: { prompt: string, options?: ConversationRequest | null }
+    requestOptions: ChatRequestOptions
     usage?: {
       completion_tokens: number
       prompt_tokens: number
@@ -65,6 +65,22 @@ declare namespace Chat {
   interface ConversationRequest {
     conversationId?: string
     parentMessageId?: string
+  }
+
+  interface QuizConfig {
+    mode: 'custom'
+    num_questions: number
+    difficulty: 'auto' | 'easy' | 'medium' | 'hard'
+    question_type: 'auto' | 'choice' | 'written' | 'coding'
+  }
+
+  type ClientMode = 'chat' | 'quiz'
+
+  interface ChatRequestOptions {
+    prompt: string
+    options?: ConversationRequest | null
+    clientMode?: ClientMode
+    quizConfig?: QuizConfig
   }
 
   interface ConversationResponse {

@@ -34,6 +34,8 @@ interface Props {
   text?: string
   images?: string[]
   toolImages?: string[] // Base64 image data from AI-generated images
+  clientMode?: Chat.ClientMode
+  quizConfig?: Chat.QuizConfig
   isRecord?: boolean
   inversion?: boolean
   error?: boolean
@@ -268,6 +270,8 @@ function isEventTargetValid(event: any) {
           :text="text"
           :images="images"
           :tool-images="toolImages"
+          :client-mode="clientMode"
+          :quiz-config="quizConfig"
           :loading="loading"
           :as-raw-text="asRawText"
         />

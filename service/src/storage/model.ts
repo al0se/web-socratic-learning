@@ -109,6 +109,14 @@ export class ChatOptions {
   completion_tokens?: number
   total_tokens?: number
   estimated?: boolean
+  clientMode?: 'chat' | 'quiz'
+  quizConfig?: {
+    mode: 'custom'
+    num_questions: number
+    difficulty: 'auto' | 'easy' | 'medium' | 'hard'
+    question_type: 'auto' | 'choice' | 'written' | 'coding'
+  }
+
   constructor(parentMessageId?: string, messageId?: string) {
     this.parentMessageId = parentMessageId
     this.messageId = messageId

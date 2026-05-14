@@ -16,11 +16,20 @@ export interface RequestProps {
   options?: ChatContext
   tools?: ImageGenerationTool[]
   previousResponseId?: string
+  clientMode?: 'chat' | 'quiz'
+  quizConfig?: QuizConfig
 }
 
 export interface ChatContext {
   conversationId?: string
   parentMessageId?: string
+}
+
+export interface QuizConfig {
+  mode: 'custom'
+  num_questions: number
+  difficulty: 'auto' | 'easy' | 'medium' | 'hard'
+  question_type: 'auto' | 'choice' | 'written' | 'coding'
 }
 
 export interface AuthJwtPayload extends JwtPayload {

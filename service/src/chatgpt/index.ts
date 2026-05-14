@@ -226,7 +226,11 @@ async function chatReplyProcess(options: RequestOptions) {
   const { message, uploadFileKeys, parentMessageId, previousResponseId, tools, process, chatUuid } = options
   const systemMessage = isNotEmptyString(options.room.prompt) ? options.room.prompt : DEFAULT_ROOM_PROMPT
   const memoryContext = await getMemoryService().buildMemoryContext(userId)
-  let instructions = combineInstructions(systemMessage, memoryContext)
+  let instructions = options.clientMode === 'quiz' && isNotEmptyString(options.clientSystemInstruction)
+    ? options.clientSystemInstruction
+    : combineInstructions(systemMessage, memoryContext)
+  if (options.clientMode !== 'quiz')
+    instructions = combineInstructions(instructions, options.clientSystemInstruction)
 
   try {
     // Initialize OpenAI client

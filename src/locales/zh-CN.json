@@ -189,6 +189,43 @@
   },
   "chat": {
     "newChatButton": "新建聊天",
+    "mode": {
+      "chat": "聊天",
+      "quiz": "题目生成"
+    },
+    "quiz": {
+      "settings": "题目设置",
+      "custom": "自定义",
+      "questions": "道题",
+      "count": "数量",
+      "difficulty": "难度",
+      "type": "类型",
+      "auto": "自动",
+      "easy": "简单",
+      "medium": "中等",
+      "hard": "困难",
+      "choice": "选择题",
+      "written": "问答题",
+      "coding": "编程题",
+      "placeholder": "输入要生成题目的主题或知识点...",
+      "answerPlaceholder": "输入你的答案...",
+      "codePlaceholder": "在这里编写代码...",
+      "checkAnswer": "查看答案",
+      "correct": "正确",
+      "incorrect": "错误",
+      "retry": "重试",
+      "referenceAnswer": "参考答案",
+      "explanation": "解析",
+      "previous": "上一题",
+      "next": "下一题",
+      "generating": "正在生成题目...",
+      "formatWarning": "题目已生成，但返回格式不是结构化题目。请点击重新生成，或换用更稳定的模型。",
+      "stage": {
+        "retrieveKnowledge": "Retrieve knowledge (batch 1)",
+        "generateTemplates": "正在生成 templates (batch 1)",
+        "generateQuestion": "正在生成问题 {index}"
+      }
+    },
     "placeholder": "来说点什么吧...（Shift + Enter = 换行）",
     "placeholderMobile": "来说点什么...",
     "copy": "复制",

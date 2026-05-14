@@ -1,6 +1,6 @@
 import type { ResponseChunk } from '../chatgpt/types'
 import type { ChatInfo, ChatOptions, ImageUsageItem, UsageResponse, UserInfo } from '../storage/model'
-import type { RequestProps } from '../types'
+import type { QuizConfig, RequestProps } from '../types'
 import * as console from 'node:console'
 import * as process from 'node:process'
 import Router from 'express'
@@ -78,6 +78,8 @@ router.get('/chat-history', auth, async (req, res) => {
           requestOptions: {
             prompt: c.prompt,
             options: null,
+            clientMode: c.options?.clientMode,
+            quizConfig: c.options?.quizConfig,
           },
         })
       }
@@ -119,6 +121,8 @@ router.get('/chat-history', auth, async (req, res) => {
             options: {
               parentMessageId: c.options.messageId,
             },
+            clientMode: c.options?.clientMode,
+            quizConfig: c.options?.quizConfig,
           },
           usage,
         }
@@ -190,6 +194,8 @@ router.get('/chat-response-history', auth, async (req, res) => {
           options: {
             parentMessageId: response.options.messageId,
           },
+          clientMode: chat.options?.clientMode,
+          quizConfig: chat.options?.quizConfig,
         },
         usage,
       },
@@ -255,7 +261,7 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'Cache-Control')
 
-  const { roomId, uuid, regenerate, prompt, uploadFileKeys = [], options = {}, tools, previousResponseId } = req.body as RequestProps
+  const { roomId, uuid, regenerate, prompt, uploadFileKeys = [], options = {}, tools, previousResponseId, clientMode, quizConfig } = req.body as RequestProps
   const userId = req.headers.userId.toString()
   const config = await getCacheConfig()
   const room = await getChatRoom(userId, roomId)
@@ -314,7 +320,16 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
       // Early exit handled in finally block
     }
     else {
-      message = regenerate ? await getChat(roomId, uuid) : await insertChat(uuid, prompt, uploadFileKeys, roomId, model, options as ChatOptions)
+      const optionsToStore = {
+        ...(options as ChatOptions),
+        ...(clientMode ? { clientMode } : {}),
+        ...(quizConfig ? { quizConfig: normalizeQuizConfig(quizConfig) } : {}),
+      } as ChatOptions
+      message = regenerate ? await getChat(roomId, uuid) : await insertChat(uuid, prompt, uploadFileKeys, roomId, model, optionsToStore)
+      const effectiveQuizConfig = normalizeQuizConfig(quizConfig || message.options?.quizConfig)
+      const clientSystemInstruction = message.options?.clientMode === 'quiz' && effectiveQuizConfig
+        ? buildQuizSystemInstruction(effectiveQuizConfig)
+        : undefined
 
       result = await chatReplyProcess({
         message: prompt,
@@ -322,6 +337,8 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
         parentMessageId: options?.parentMessageId,
         previousResponseId,
         tools,
+        clientMode: message.options?.clientMode || 'chat',
+        clientSystemInstruction,
         process: (chunk: ResponseChunk) => {
           lastResponse = chunk
 
@@ -442,7 +459,7 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
                 previousResponse.push({ response: message.response, options: message.options })
                 await updateChat(
                   message._id as unknown as string,
-                  result.data.reasoning,
+                  message.options?.clientMode === 'quiz' ? '' : result.data.reasoning,
                   result.data.text,
                   result.data.id,
                   model,
@@ -457,7 +474,7 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
               else {
                 await updateChat(
                   message._id as unknown as string,
-                  result.data.reasoning,
+                  message.options?.clientMode === 'quiz' ? '' : result.data.reasoning,
                   result.data.text,
                   result.data.id,
                   model,
@@ -481,7 +498,7 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
                   await updateAmountMinusOne(userId)
               }
 
-              if (!regenerate && result.data.text?.trim()) {
+              if (!regenerate && message.options?.clientMode !== 'quiz' && result.data.text?.trim()) {
                 try {
                   await getMemoryService().refreshFromTurn({
                     userMessage: prompt,
@@ -513,6 +530,61 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
 
 function containsChinese(text: string): boolean {
   return /[\u4E00-\u9FFF]/.test(text)
+}
+
+function normalizeQuizConfig(config: QuizConfig | undefined): QuizConfig | undefined {
+  if (!config || config.mode !== 'custom')
+    return undefined
+
+  const difficultyValues: QuizConfig['difficulty'][] = ['auto', 'easy', 'medium', 'hard']
+  const questionTypeValues: QuizConfig['question_type'][] = ['auto', 'choice', 'written', 'coding']
+
+  return {
+    mode: 'custom',
+    num_questions: Math.max(1, Math.min(50, Number(config.num_questions) || 3)),
+    difficulty: difficultyValues.includes(config.difficulty) ? config.difficulty : 'auto',
+    question_type: questionTypeValues.includes(config.question_type) ? config.question_type : 'auto',
+  }
+}
+
+function buildQuizSystemInstruction(config: QuizConfig): string {
+  const difficulty = config.difficulty === 'auto' ? 'choose a suitable difficulty' : config.difficulty
+  const questionType = config.question_type === 'auto' ? 'choose suitable types among choice, written, and coding' : config.question_type
+
+  return `You are DeepTutor's quiz generation capability.
+Generate exactly ${config.num_questions} high-quality learning questions for the user's topic.
+Mode: custom.
+Difficulty: ${difficulty}.
+Question type: ${questionType}.
+
+Rules:
+- Reply in the same language as the user's topic.
+- The only allowed question_type values are "choice", "written", and "coding".
+- For choice questions, provide options as an object with keys "A", "B", "C", "D" and set correct_answer to the correct key.
+- For written and coding questions, provide a concise reference answer in correct_answer.
+- Provide a helpful explanation for every question.
+- Avoid duplicate or near-duplicate questions.
+- Return only valid JSON. Do not wrap it in Markdown and do not add prose.
+
+JSON schema:
+{
+  "summary": {
+    "results": [
+      {
+        "qa_pair": {
+          "question_id": "q_1",
+          "question_type": "choice | written | coding",
+          "difficulty": "easy | medium | hard",
+          "concentration": "short topic tag",
+          "question": "question text",
+          "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+          "correct_answer": "answer",
+          "explanation": "explanation"
+        }
+      }
+    ]
+  }
+}`
 }
 
 router.post('/chat-abort', [auth, limiter], async (req, res) => {

@@ -6,6 +6,7 @@ import mila from 'markdown-it-link-attributes'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { copyToClip } from '@/utils/copy'
 import ImagePreview from './ImagePreview.vue'
+import QuizGeneration from './QuizGeneration.vue'
 
 const props = defineProps<Props>()
 
@@ -17,6 +18,8 @@ interface Props {
   text?: string
   images?: string[]
   toolImages?: string[] // Local file names from AI-generated images (stored as local file names, e.g., "image-xxx.png")
+  clientMode?: Chat.ClientMode
+  quizConfig?: Chat.QuizConfig
   loading?: boolean
   asRawText?: boolean
 }
@@ -178,7 +181,13 @@ onUnmounted(() => {
   <div class="text-black" :class="wrapClass">
     <div ref="textRef" class="leading-relaxed break-words">
       <div v-if="!inversion" class="flex items-end">
-        <div v-if="!asRawText" class="w-full markdown-body" :class="{ 'markdown-body-generate': loading }" v-html="text" />
+        <QuizGeneration
+          v-if="clientMode === 'quiz' && !asRawText"
+          :text="props.text"
+          :loading="loading"
+          :quiz-config="quizConfig"
+        />
+        <div v-else-if="!asRawText" class="w-full markdown-body" :class="{ 'markdown-body-generate': loading }" v-html="text" />
         <div v-else class="w-full whitespace-pre-wrap break-words" v-text="text" />
       </div>
       <div v-else class="w-full whitespace-pre-wrap break-words" v-text="text" />

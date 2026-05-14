@@ -1,5 +1,6 @@
 <script setup lang='ts'>
 import type { MessageReactive, UploadFileInfo } from 'naive-ui'
+import type { QuizConfig } from './utils/quiz'
 import html2canvas from 'html2canvas'
 import { h } from 'vue'
 import {
@@ -13,8 +14,10 @@ import { useAuthStore, useChatStore, useUserStore } from '@/store'
 import { debounce } from '@/utils/functions/debounce'
 import { Message } from './components'
 import HeaderComponent from './components/Header/index.vue'
+import QuizConfigPanel from './components/QuizConfigPanel.vue'
 import { useChat } from './hooks/useChat'
 import { useScroll } from './hooks/useScroll'
+import { DEFAULT_QUIZ_CONFIG } from './utils/quiz'
 
 const { t } = useI18n()
 
@@ -50,6 +53,8 @@ const firstLoading = ref<boolean>(false)
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
 const mobileSettingsExpanded = ref(false)
+const activeMode = ref<Chat.ClientMode>('chat')
+const quizConfig = ref<QuizConfig>({ ...DEFAULT_QUIZ_CONFIG })
 
 const loadingChatUuid = ref<number>(-1)
 
@@ -215,6 +220,12 @@ async function onConversation() {
 
   const uploadFileKeys = uploadFileKeysRef.value.map(item => item.fileUrl || item.fileKey)
   uploadFileKeysRef.value = []
+  const clientMode = activeMode.value
+  const currentQuizConfig = clientMode === 'quiz' ? { ...quizConfig.value } : undefined
+  const clientRequestMeta = {
+    clientMode,
+    quizConfig: currentQuizConfig,
+  }
 
   controller = new AbortController()
 
@@ -231,7 +242,7 @@ async function onConversation() {
       inversion: true,
       error: false,
       conversationOptions: null,
-      requestOptions: { prompt: message, options: null },
+      requestOptions: { prompt: message, options: null, ...clientRequestMeta },
     },
   )
   await scrollToBottom()
@@ -260,7 +271,7 @@ async function onConversation() {
       inversion: false,
       error: false,
       conversationOptions: null,
-      requestOptions: { prompt: message, options: { ...options } },
+      requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
     },
   )
   await scrollToBottom()
@@ -288,6 +299,8 @@ async function onConversation() {
         options,
         tools: currentChatRoom.value?.toolsEnabled ? [{ type: 'image_generation' }] : undefined,
         previousResponseId: currentChatRoom.value?.toolsEnabled && lastToolResponseId.value ? lastToolResponseId.value : undefined,
+        clientMode,
+        quizConfig: currentQuizConfig,
         signal: controller.signal,
       }, {
         onSearching: (data) => {
@@ -426,7 +439,7 @@ async function onConversation() {
               error: false,
               loading: true,
               conversationOptions: null,
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
             },
           )
 
@@ -485,7 +498,7 @@ async function onConversation() {
               error: false,
               loading: true,
               conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
               usage,
               tool_calls: data.tool_calls,
             },
@@ -547,7 +560,7 @@ async function onConversation() {
               error: false,
               loading: false,
               conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
               usage,
               tool_calls: toolCalls,
               tool_images: imageResults.length > 0 ? imageResults : undefined,
@@ -566,7 +579,7 @@ async function onConversation() {
               error: true,
               loading: false,
               conversationOptions: null,
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
             },
           )
         },
@@ -618,7 +631,7 @@ async function onConversation() {
         error: true,
         loading: false,
         conversationOptions: null,
-        requestOptions: { prompt: message, options: { ...options } },
+        requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
       },
     )
     scrollToBottomIfAtBottom()
@@ -644,6 +657,12 @@ async function onRegenerate(index: number) {
 
   if (requestOptions.options)
     options = { ...requestOptions.options }
+  const clientMode = requestOptions.clientMode ?? 'chat'
+  const currentQuizConfig = requestOptions.quizConfig
+  const clientRequestMeta = {
+    clientMode,
+    quizConfig: currentQuizConfig,
+  }
   const uploadFileKeys = Array.isArray(dataSources.value[index]?.images)
     ? [...dataSources.value[index].images]
     : []
@@ -662,7 +681,7 @@ async function onRegenerate(index: number) {
       error: false,
       loading: true,
       conversationOptions: null,
-      requestOptions: { prompt: message, options: { ...options } },
+      requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
     },
   )
 
@@ -690,6 +709,8 @@ async function onRegenerate(index: number) {
         options,
         tools: currentChatRoom.value?.toolsEnabled ? [{ type: 'image_generation' }] : undefined,
         previousResponseId: currentChatRoom.value?.toolsEnabled && lastToolResponseId.value ? lastToolResponseId.value : undefined,
+        clientMode,
+        quizConfig: currentQuizConfig,
         signal: controller.signal,
       }, {
         onSearching: (data) => {
@@ -830,7 +851,7 @@ async function onRegenerate(index: number) {
               error: false,
               loading: true,
               conversationOptions: null,
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
             },
           )
 
@@ -890,7 +911,7 @@ async function onRegenerate(index: number) {
               error: false,
               loading: true,
               conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
               usage,
               tool_calls: data.tool_calls,
             },
@@ -938,7 +959,7 @@ async function onRegenerate(index: number) {
               error: false,
               loading: false,
               conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
               usage,
               tool_calls: data.tool_calls,
             },
@@ -956,7 +977,7 @@ async function onRegenerate(index: number) {
               error: true,
               loading: false,
               conversationOptions: null,
-              requestOptions: { prompt: message, options: { ...options } },
+              requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
             },
           )
         },
@@ -992,7 +1013,7 @@ async function onRegenerate(index: number) {
         error: true,
         loading: false,
         conversationOptions: null,
-        requestOptions: { prompt: message, options: { ...options } },
+        requestOptions: { prompt: message, options: { ...options }, ...clientRequestMeta },
       },
     )
   }
@@ -1015,7 +1036,12 @@ async function onResponseHistory(index: number, historyIndex: number) {
       error: true,
       loading: false,
       conversationOptions: chat.conversationOptions,
-      requestOptions: { prompt: chat.requestOptions.prompt, options: { ...chat.requestOptions.options } },
+      requestOptions: {
+        prompt: chat.requestOptions.prompt,
+        options: { ...chat.requestOptions.options },
+        clientMode: chat.requestOptions.clientMode,
+        quizConfig: chat.requestOptions.quizConfig,
+      },
       usage: chat.usage,
     },
   )
@@ -1210,6 +1236,8 @@ async function handleToggleKnowledgeGraphEnabled() {
 }
 
 const placeholder = computed(() => {
+  if (activeMode.value === 'quiz')
+    return t('chat.quiz.placeholder')
   if (isMobile.value)
     return t('chat.placeholderMobile')
   return t('chat.placeholder')
@@ -1576,10 +1604,12 @@ onUnmounted(() => {
                   :knowledge-graph-message="item?.knowledgeGraphMessage"
                   :knowledge-graph-results="item?.knowledgeGraphResults"
                   :knowledge-graph-usage-time="item?.knowledgeGraphUsageTime"
-                  :reasoning="item?.reasoning"
+                  :reasoning="item.requestOptions?.clientMode === 'quiz' ? undefined : item?.reasoning"
                   :text="item.text"
                   :images="item.images"
                   :tool-images="item.tool_images"
+                  :client-mode="item.requestOptions?.clientMode"
+                  :quiz-config="item.requestOptions?.quizConfig"
                   :inversion="item.inversion"
                   :response-count="item.responseCount"
                   :usage="item && item.usage || undefined"
@@ -1684,6 +1714,14 @@ onUnmounted(() => {
               :render-label="renderChatModelLabel"
               @update:value="handleSyncChatModel"
             />
+            <NRadioGroup v-if="!isMobile" v-model:value="activeMode" size="small">
+              <NRadioButton value="chat">
+                {{ t('chat.mode.chat') }}
+              </NRadioButton>
+              <NRadioButton value="quiz">
+                {{ t('chat.mode.quiz') }}
+              </NRadioButton>
+            </NRadioGroup>
             <HoverButton
               v-if="!isMobile"
               :tooltip="currentChatRoom?.searchEnabled ? t('chat.clickTurnOffSearch') : t('chat.clickTurnOnSearch')"
@@ -1725,6 +1763,14 @@ onUnmounted(() => {
               @update:value="handleSyncChatModel"
             />
             <div class="grid grid-cols-2 gap-2">
+              <NRadioGroup v-model:value="activeMode" size="small" class="col-span-2">
+                <NRadioButton value="chat">
+                  {{ t('chat.mode.chat') }}
+                </NRadioButton>
+                <NRadioButton value="quiz">
+                  {{ t('chat.mode.quiz') }}
+                </NRadioButton>
+              </NRadioGroup>
               <button
                 type="button"
                 class="flex h-10 items-center justify-center gap-1 rounded-lg border border-[#e5e7eb] px-2 text-xs font-semibold transition hover:bg-neutral-50 dark:border-[#414755] dark:hover:bg-[#414755]"
@@ -1745,6 +1791,10 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
+          <QuizConfigPanel
+            v-if="activeMode === 'quiz'"
+            v-model:value="quizConfig"
+          />
           <div class="flex items-center justify-between space-x-2">
             <NInput
               ref="inputRef"
