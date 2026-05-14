@@ -2,6 +2,7 @@
 import type { Component } from 'vue'
 import type { Language, Theme } from '@/store/modules/app/helper'
 import type { UserInfo } from '@/store/modules/user/helper'
+import { h } from 'vue'
 import { decode_redeemcard, fetchClearAllChat, fetchUpdateUserChatModel } from '@/api'
 import { UserConfig } from '@/components/common/Setting/model'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
@@ -23,10 +24,16 @@ onMounted(() => {
 const { isMobile } = useBasicLayout()
 
 const ms = useMessage()
+const dialog = useDialog()
 
 const theme = computed(() => appStore.theme)
 
 const userInfo = computed(() => userStore.userInfo)
+const currentChatRoom = computed(() => chatStore.getChatRoomByCurrentActive)
+const currentChatData = computed(() => currentChatRoom.value?.roomId ? chatStore.getChatByUuid(currentChatRoom.value.roomId) : [])
+const chatModelDisabled = computed(() => {
+  return !currentChatRoom.value || (!!authStore.session?.auth && !authStore.token && !authStore.session?.authProxyEnabled)
+})
 
 const avatar = ref(userInfo.value.avatar ?? '')
 
@@ -70,6 +77,45 @@ const languageOptions: { label: string, key: Language, value: Language }[] = [
   { label: 'English', key: 'en-US', value: 'en-US' },
 ]
 
+function isExternalModel(value: string): boolean {
+  return value.startsWith('external:')
+}
+
+function getExternalModelUrl(value: string): string | null {
+  if (!isExternalModel(value))
+    return null
+
+  const parts = value.split(':')
+  if (parts.length >= 3)
+    return parts.slice(2).join(':')
+
+  return null
+}
+
+const chatModelOptions = computed(() => {
+  const baseModels = authStore.session?.chatModels ?? []
+  const externalSites = authStore.session?.externalChatSites ?? []
+  const externalOptions = externalSites.map(site => ({
+    label: site.name,
+    key: `external:${site.name}`,
+    value: `external:${site.name}:${site.url}`,
+  }))
+
+  return [...baseModels, ...externalOptions]
+})
+
+function renderChatModelLabel(option: { label: string, value: string }, _selected: boolean) {
+  if (isExternalModel(option.value)) {
+    return h('span', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      option.label,
+      h(IconRiExternalLinkLine, {
+        style: { fontSize: '14px', color: 'var(--n-text-color-secondary)' },
+      }),
+    ])
+  }
+  return option.label
+}
+
 async function updateUserInfo(options: Partial<UserInfo>) {
   await userStore.updateUserInfo(true, options)
   ms.success(`更新个人信息 ${t('common.success')}`)
@@ -102,6 +148,59 @@ async function updateUserChatModel(chatModel: string) {
   userStore.userInfo.config.chatModel = chatModel
   userStore.recordState()
   await fetchUpdateUserChatModel(chatModel)
+}
+
+async function updateCurrentChatModel(chatModel: string) {
+  if (isExternalModel(chatModel)) {
+    const url = getExternalModelUrl(chatModel)
+    if (url) {
+      const w = window.open(url, '_blank', 'noopener,noreferrer')
+      if (w)
+        w.opener = null
+    }
+    return
+  }
+
+  if (!currentChatRoom.value)
+    return
+
+  const previousModel = currentChatRoom.value.chatModel
+  const previousToolsEnabled = currentChatRoom.value.toolsEnabled ?? false
+
+  await chatStore.setChatModel(chatModel)
+
+  const newToolsEnabled = currentChatRoom.value?.toolsEnabled ?? false
+  if (previousToolsEnabled === newToolsEnabled || currentChatData.value.length === 0)
+    return
+
+  const d = dialog.warning({
+    title: t('setting.chatModelSwitchTitle'),
+    content: t('setting.chatModelSwitchContent'),
+    positiveText: t('common.yes'),
+    negativeText: t('common.no'),
+    closable: false,
+    maskClosable: false,
+    onPositiveClick: async () => {
+      try {
+        if (previousModel)
+          await chatStore.setChatModel(previousModel)
+        await chatStore.addNewChatRoom(chatModel)
+        await chatStore.setChatModel(chatModel)
+      }
+      finally {
+        d.destroy()
+      }
+    },
+    onNegativeClick: async () => {
+      try {
+        if (previousModel)
+          await chatStore.setChatModel(previousModel)
+      }
+      finally {
+        d.destroy()
+      }
+    },
+  })
 }
 
 async function updateUserMaxContextCount(maxContextCount: number) {
@@ -206,6 +305,19 @@ function handleImportButtonClick(): void {
         </NButton>
       </div>
       <NDivider />
+      <div class="flex items-center space-x-4">
+        <span class="shrink-0 w-[100px]">{{ t('setting.currentChatModel') }}</span>
+        <div class="w-[250px]">
+          <NSelect
+            style="width: 250px"
+            :value="currentChatRoom?.chatModel"
+            :options="chatModelOptions"
+            :disabled="chatModelDisabled"
+            :render-label="renderChatModelLabel"
+            @update:value="updateCurrentChatModel"
+          />
+        </div>
+      </div>
       <div class="flex items-center space-x-4">
         <span class="shrink-0 w-[100px]">{{ t('setting.defaultChatModel') }}</span>
         <div class="w-[200px]">

@@ -114,7 +114,7 @@ export class ChatOptions {
     mode: 'custom'
     num_questions: number
     difficulty: 'auto' | 'easy' | 'medium' | 'hard'
-    question_type: 'auto' | 'choice' | 'written' | 'coding'
+    question_type: 'auto' | 'choice' | 'written'
   }
 
   constructor(parentMessageId?: string, messageId?: string) {

@@ -280,8 +280,7 @@ onUnmounted(() => {
           type="textarea"
           :disabled="currentAnswer.submitted"
           :autosize="{ minRows: 3, maxRows: 8 }"
-          :placeholder="currentQuestion.question_type === 'coding' ? t('chat.quiz.codePlaceholder') : t('chat.quiz.answerPlaceholder')"
-          :input-props="{ class: currentQuestion.question_type === 'coding' ? 'font-mono' : '' }"
+          :placeholder="t('chat.quiz.answerPlaceholder')"
           @update:value="setTyped"
         />
       </div>

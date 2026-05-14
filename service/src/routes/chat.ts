@@ -620,7 +620,7 @@ function normalizeQuizConfig(config: QuizConfig | undefined): QuizConfig | undef
     return undefined
 
   const difficultyValues: QuizConfig['difficulty'][] = ['auto', 'easy', 'medium', 'hard']
-  const questionTypeValues: QuizConfig['question_type'][] = ['auto', 'choice', 'written', 'coding']
+  const questionTypeValues: QuizConfig['question_type'][] = ['auto', 'choice', 'written']
 
   return {
     mode: 'custom',
@@ -632,7 +632,7 @@ function normalizeQuizConfig(config: QuizConfig | undefined): QuizConfig | undef
 
 function buildQuizSystemInstruction(config: QuizConfig): string {
   const difficulty = config.difficulty === 'auto' ? 'choose a suitable difficulty' : config.difficulty
-  const questionType = config.question_type === 'auto' ? 'choose suitable types among choice, written, and coding' : config.question_type
+  const questionType = config.question_type === 'auto' ? 'choose suitable types among choice and written' : config.question_type
 
   return `You are DeepTutor's quiz generation capability.
 Generate exactly ${config.num_questions} high-quality learning questions for the user's topic.
@@ -642,9 +642,9 @@ Question type: ${questionType}.
 
 Rules:
 - Reply in the same language as the user's topic.
-- The only allowed question_type values are "choice", "written", and "coding".
+- The only allowed question_type values are "choice" and "written".
 - For choice questions, provide options as an object with keys "A", "B", "C", "D" and set correct_answer to the correct key.
-- For written and coding questions, provide a concise reference answer in correct_answer.
+- For written questions, provide a concise reference answer in correct_answer.
 - Provide a helpful explanation for every question.
 - Avoid duplicate or near-duplicate questions.
 - Return only valid JSON. Do not wrap it in Markdown and do not add prose.
@@ -656,7 +656,7 @@ JSON schema:
       {
         "qa_pair": {
           "question_id": "q_1",
-          "question_type": "choice | written | coding",
+          "question_type": "choice | written",
           "difficulty": "easy | medium | hard",
           "concentration": "short topic tag",
           "question": "question text",

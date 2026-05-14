@@ -2,7 +2,6 @@
 import type { MessageReactive, UploadFileInfo } from 'naive-ui'
 import type { QuizConfig } from './utils/quiz'
 import html2canvas from 'html2canvas'
-import { h } from 'vue'
 import {
   fetchChatAPIProcessSSE,
   fetchChatResponseoHistory,
@@ -1259,16 +1258,6 @@ function isExternalModel(value: string): boolean {
   return value.startsWith('external:')
 }
 
-// Extract URL from external chat site value
-function getExternalModelUrl(value: string): string | null {
-  if (!isExternalModel(value))
-    return null
-  const parts = value.split(':')
-  if (parts.length >= 3)
-    return parts.slice(2).join(':') // Handle URLs that may contain : symbol
-  return null
-}
-
 const chatModelOptions = computed(() => {
   const baseModels = authStore.session?.chatModels ?? []
   const externalSites = authStore.session?.externalChatSites ?? []
@@ -1316,82 +1305,6 @@ async function syncStaleChatModelIfNeeded() {
   }
   finally {
     syncingStaleChatModel.value = false
-  }
-}
-
-function renderChatModelLabel(option: { label: string, value: string }, _selected: boolean) {
-  if (isExternalModel(option.value)) {
-    return h('span', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-      option.label,
-      h(IconRiExternalLinkLine, {
-        style: { fontSize: '14px', color: 'var(--n-text-color-secondary)' },
-      }),
-    ])
-  }
-  return option.label
-}
-
-async function handleSyncChatModel(chatModel: string) {
-  // Check if it's an external chat site, open in new tab if so
-  if (isExternalModel(chatModel)) {
-    const url = getExternalModelUrl(chatModel)
-    if (url) {
-      const w = window.open(url, '_blank', 'noopener,noreferrer')
-      if (w)
-        w.opener = null
-    }
-    return
-  }
-
-  // Save previous model and toolsEnabled state before switching
-  const previousModel = currentChatRoom.value?.chatModel
-  const previousToolsEnabled = currentChatRoom.value?.toolsEnabled ?? false
-
-  await chatStore.setChatModel(chatModel)
-  const newToolsEnabled = currentChatRoom.value?.toolsEnabled ?? false
-  if (previousToolsEnabled !== newToolsEnabled) {
-    // Check whether the current room has history.
-    const hasHistory = dataSources.value.length > 0
-
-    // If no history, skip modal and clear lastToolResponseId.
-    if (!hasHistory) {
-      lastToolResponseId.value = ''
-      return
-    }
-
-    // If history exists, prompt to start a new session.
-    const d = dialog.warning({
-      title: '切换模型提示',
-      content: '检测到工具调用功能状态已变化，为避免混用，是否新开一个会话？',
-      positiveText: t('common.yes'),
-      negativeText: t('common.no'),
-      closable: false,
-      maskClosable: false,
-      onPositiveClick: async () => {
-        try {
-          if (previousModel) {
-            await chatStore.setChatModel(previousModel)
-          }
-          await chatStore.addNewChatRoom(chatModel)
-          await chatStore.setChatModel(chatModel)
-          lastToolResponseId.value = ''
-        }
-        finally {
-          d.destroy()
-        }
-      },
-      onNegativeClick: async () => {
-        try {
-          // User chose not to switch; revert to the previous model.
-          if (previousModel) {
-            await chatStore.setChatModel(previousModel)
-          }
-        }
-        finally {
-          d.destroy()
-        }
-      },
-    })
   }
 }
 
@@ -1700,22 +1613,13 @@ onUnmounted(() => {
                 <span>{{ t('setting.setting') }}</span>
               </span>
               <span class="flex min-w-0 items-center gap-2 text-xs text-[#6f7782] dark:text-[#c2c8d1]">
-                <span class="max-w-[42vw] truncate">{{ currentChatRoom?.chatModel }}</span>
+                <span class="max-w-[42vw] truncate">{{ activeMode === 'quiz' ? t('chat.mode.quiz') : t('chat.mode.chat') }}</span>
                 <IconRiArrowDownSLine
                   class="shrink-0 text-lg transition-transform duration-200"
                   :class="{ 'rotate-180': mobileSettingsExpanded }"
                 />
               </span>
             </button>
-            <NSelect
-              v-if="!isMobile"
-              :style="{ width: isMobile ? '100%' : '250px' }"
-              :value="currentChatRoom?.chatModel"
-              :options="chatModelOptions"
-              :disabled="!!authStore.session?.auth && !authStore.token && !authStore.session?.authProxyEnabled"
-              :render-label="renderChatModelLabel"
-              @update:value="handleSyncChatModel"
-            />
             <NRadioGroup v-if="!isMobile" v-model:value="activeMode" size="small">
               <NRadioButton value="chat">
                 {{ t('chat.mode.chat') }}
@@ -1755,15 +1659,6 @@ onUnmounted(() => {
             id="mobile-chat-settings"
             class="rounded-xl border border-[#e5e7eb] bg-white/95 p-2 shadow-sm dark:border-[#414755] dark:bg-[#2f3440]"
           >
-            <NSelect
-              class="mb-2"
-              :style="{ width: '100%' }"
-              :value="currentChatRoom?.chatModel"
-              :options="chatModelOptions"
-              :disabled="!!authStore.session?.auth && !authStore.token && !authStore.session?.authProxyEnabled"
-              :render-label="renderChatModelLabel"
-              @update:value="handleSyncChatModel"
-            />
             <div class="grid grid-cols-2 gap-2">
               <NRadioGroup v-model:value="activeMode" size="small" class="col-span-2">
                 <NRadioButton value="chat">

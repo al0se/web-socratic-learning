@@ -81,7 +81,6 @@ function updateConfig<K extends keyof QuizConfig>(key: K, value: QuizConfig[K]) 
             { label: t('chat.quiz.auto'), value: 'auto' },
             { label: t('chat.quiz.choice'), value: 'choice' },
             { label: t('chat.quiz.written'), value: 'written' },
-            { label: t('chat.quiz.coding'), value: 'coding' },
           ]"
           @update:value="value => updateConfig('question_type', value)"
         />

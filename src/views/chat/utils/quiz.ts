@@ -1,4 +1,4 @@
-export type QuizQuestionType = 'choice' | 'written' | 'coding'
+export type QuizQuestionType = 'choice' | 'written'
 export type QuizDifficulty = 'auto' | 'easy' | 'medium' | 'hard'
 
 export interface QuizConfig {
@@ -44,8 +44,6 @@ function normalizeQuestionType(value: unknown): QuizQuestionType {
   const type = String(value || '').toLowerCase()
   if (type === 'choice' || type === 'multiple_choice')
     return 'choice'
-  if (type === 'coding' || type === 'code')
-    return 'coding'
   return 'written'
 }
 

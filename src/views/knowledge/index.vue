@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { SelectOption } from 'naive-ui'
+
 type TabKey = 'knowledge' | 'notebooks' | 'questions' | 'skills'
 type KnowledgeStatus = 'ready' | 'indexing' | 'draft'
 type QuestionFilter = 'all' | 'bookmarked' | 'wrong'
@@ -58,11 +60,6 @@ interface SkillItem {
   name: string
   description: string
   content: string
-}
-
-interface SelectOption {
-  label: string
-  value: string | number
 }
 
 const { t } = useI18n()
@@ -623,15 +620,6 @@ function removeSkill(id: number) {
                 {{ t('knowledge.title') }}
               </h1>
             </div>
-
-            <NTooltip trigger="hover">
-              <template #trigger>
-                <NTag round size="small" type="info">
-                  {{ t('knowledge.frontendOnly') }}
-                </NTag>
-              </template>
-              {{ t('knowledge.mockHint') }}
-            </NTooltip>
           </div>
 
           <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -770,7 +758,7 @@ function removeSkill(id: number) {
                         {{ t('knowledge.providerLabel') }}
                       </div>
                       <div class="mt-2 text-sm font-medium">
-                        {{ providerOptions.find(option => option.value === selectedKnowledgeBase.provider)?.label }}
+                        {{ providerOptions.find(option => option.value === selectedKnowledgeBase?.provider)?.label }}
                       </div>
                     </div>
                     <div class="rounded-2xl bg-[var(--dt-muted)] px-4 py-3">
