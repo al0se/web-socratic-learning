@@ -83,15 +83,11 @@
     "cancel": "Cancel",
     "tabs": {
       "knowledge": "Knowledge Bases",
-      "notebooks": "Notebooks",
-      "questions": "Question Notebook",
-      "skills": "Skills"
+      "questions": "Question Notes"
     },
     "stats": {
       "knowledgeBases": "Knowledge bases",
-      "notebooks": "Notebooks",
-      "questions": "Question cards",
-      "skills": "Skills"
+      "questions": "Question cards"
     },
     "listTitle": "Library",
     "listDescription": "Browse available knowledge bases and inspect their frontend states.",
@@ -131,30 +127,12 @@
       "uploaded": "Mock files added to the selected knowledge base.",
       "deleted": "Knowledge base removed.",
       "defaultChanged": "Default knowledge base updated.",
-      "notebookCreated": "Notebook created.",
-      "notebookDeleted": "Notebook removed.",
-      "recordDeleted": "Notebook record removed.",
       "categoryCreated": "Category added.",
-      "categoryCleared": "Category cleared from the notebook.",
-      "questionDeleted": "Question removed.",
-      "skillCreated": "Skill created.",
-      "skillUpdated": "Skill updated.",
-      "skillDeleted": "Skill removed."
-    },
-    "notebooks": {
-      "title": "Notebooks",
-      "description": "Collect structured notes, generated summaries, and reusable study material.",
-      "createTitle": "New notebook",
-      "namePlaceholder": "Notebook name",
-      "descriptionPlaceholder": "What does this notebook collect?",
-      "recordCount": "records",
-      "selectNotebook": "Select a notebook",
-      "noRecords": "No notebook records yet.",
-      "expand": "Expand",
-      "collapse": "Collapse"
+      "categoryCleared": "Category cleared from question notes.",
+      "questionDeleted": "Question removed."
     },
     "questions": {
-      "title": "Question notebook",
+      "title": "Question notes",
       "description": "Review saved questions by filter and category, similar to DeepTutor's question-review workspace.",
       "filters": {
         "all": "All",
@@ -172,19 +150,10 @@
       "removeCategory": "Remove category",
       "bookmark": "Bookmark",
       "bookmarked": "Bookmarked",
+      "generatedCategory": "Generated quiz",
+      "generatedSessionTitle": "Quiz generation",
       "correct": "Correct",
       "incorrect": "Needs review"
-    },
-    "skills": {
-      "title": "Skills",
-      "description": "Short playbooks that shape agent behavior, shown here in the current UI system.",
-      "newSkill": "New skill",
-      "noSkills": "No skills yet.",
-      "editSkill": "Edit skill",
-      "namePlaceholder": "e.g. exam-coach",
-      "descriptionPlaceholder": "Short summary for when this skill should be used.",
-      "bodyLabel": "Markdown body",
-      "bodyPlaceholder": "# Skill\n\nDescribe the behavior..."
     }
   },
   "chat": {

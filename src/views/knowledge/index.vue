@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { SelectOption } from 'naive-ui'
+import type { QuizAnswerHistoryItem } from '@/api'
+import { fetchDeleteQuizQuestion, fetchQuizQuestions } from '@/api'
 
-type TabKey = 'knowledge' | 'notebooks' | 'questions' | 'skills'
+type TabKey = 'knowledge' | 'questions'
 type KnowledgeStatus = 'ready' | 'indexing' | 'draft'
 type QuestionFilter = 'all' | 'bookmarked' | 'wrong'
 
@@ -18,23 +20,6 @@ interface KnowledgeBaseItem {
   isDefault: boolean
 }
 
-interface NotebookRecordItem {
-  id: number
-  title: string
-  type: string
-  summary: string
-  output: string
-  updatedAt: string
-}
-
-interface NotebookItem {
-  id: number
-  name: string
-  description: string
-  color: string
-  records: NotebookRecordItem[]
-}
-
 interface QuestionChoice {
   key: string
   text: string
@@ -42,6 +27,7 @@ interface QuestionChoice {
 
 interface QuestionItem {
   id: number
+  sourceKey?: string
   title: string
   prompt: string
   category: string | null
@@ -55,15 +41,50 @@ interface QuestionItem {
   createdAt: string
 }
 
-interface SkillItem {
-  id: number
-  name: string
-  description: string
-  content: string
-}
+const HIDDEN_SAMPLE_QUESTION_KEYS_STORAGE = 'deepTutor:hiddenSampleQuestionKeys'
+const CLEARED_SAMPLE_CATEGORIES_STORAGE = 'deepTutor:clearedSampleQuestionCategories'
 
 const { t } = useI18n()
 const message = useMessage()
+
+function hasLocalStorage() {
+  return typeof window !== 'undefined' && !!window.localStorage
+}
+
+function loadStringList(key: string) {
+  if (!hasLocalStorage())
+    return []
+
+  try {
+    const raw = window.localStorage.getItem(key)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  }
+  catch {
+    return []
+  }
+}
+
+function saveStringList(key: string, values: string[]) {
+  if (!hasLocalStorage())
+    return
+
+  window.localStorage.setItem(key, JSON.stringify([...new Set(values)]))
+}
+
+function hideSampleQuestion(sourceKey: string) {
+  saveStringList(HIDDEN_SAMPLE_QUESTION_KEYS_STORAGE, [
+    ...loadStringList(HIDDEN_SAMPLE_QUESTION_KEYS_STORAGE),
+    sourceKey,
+  ])
+}
+
+function clearSampleCategory(category: string) {
+  saveStringList(CLEARED_SAMPLE_CATEGORIES_STORAGE, [
+    ...loadStringList(CLEARED_SAMPLE_CATEGORIES_STORAGE),
+    category,
+  ])
+}
 
 function iso(hoursAgo = 0) {
   return new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString()
@@ -110,58 +131,16 @@ function buildKnowledgeBases(): KnowledgeBaseItem[] {
   ]
 }
 
-function buildNotebooks(): NotebookItem[] {
-  return [
-    {
-      id: 1,
-      name: 'Exam Repair',
-      description: 'A notebook for weak spots, review loops, and model-generated outlines.',
-      color: '#4B8F5A',
-      records: [
-        {
-          id: 101,
-          title: 'Gaussian elimination recap',
-          type: 'summary',
-          summary: 'Condenses the elimination workflow into three repeatable checkpoints.',
-          output: '1. Normalize the pivot row.\n2. Eliminate downward before eliminating upward.\n3. Re-check rank when the system looks inconsistent.',
-          updatedAt: iso(4),
-        },
-        {
-          id: 102,
-          title: 'Review session outline',
-          type: 'outline',
-          summary: 'A 45-minute sequence for warm-up, guided practice, and self-explanation.',
-          output: 'Warm-up with two quick determinant checks, then solve one row-reduction example out loud, and finish with a peer-teaching recap.',
-          updatedAt: iso(10),
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: 'Office Hours',
-      description: 'Collected snippets from common learner questions and follow-up prompts.',
-      color: '#3A6EA5',
-      records: [
-        {
-          id: 201,
-          title: 'Prompt bank for misconceptions',
-          type: 'prompt',
-          summary: 'Reusable questions for surfacing hidden assumptions before giving hints.',
-          output: 'What did you assume was preserved in this transformation? Which step would still hold if the coefficient became zero?',
-          updatedAt: iso(28),
-        },
-      ],
-    },
-  ]
-}
-
 function buildQuestions(): QuestionItem[] {
-  return [
+  const clearedSampleCategories = new Set(loadStringList(CLEARED_SAMPLE_CATEGORIES_STORAGE))
+  const hiddenSampleQuestionKeys = new Set(loadStringList(HIDDEN_SAMPLE_QUESTION_KEYS_STORAGE))
+  const questions: QuestionItem[] = [
     {
       id: 1,
+      sourceKey: 'sample:linear-algebra-invertible-matrix',
       title: 'Which matrix is invertible?',
       prompt: 'Select the option that guarantees the matrix has full rank.',
-      category: 'Linear Algebra',
+      category: clearedSampleCategories.has('Linear Algebra') ? null : 'Linear Algebra',
       bookmarked: true,
       isCorrect: false,
       options: [
@@ -177,9 +156,10 @@ function buildQuestions(): QuestionItem[] {
     },
     {
       id: 2,
+      sourceKey: 'sample:physics-momentum-conservation',
       title: 'Explain momentum conservation',
       prompt: 'Write a short explanation for why total momentum stays constant in an isolated system.',
-      category: 'Physics',
+      category: clearedSampleCategories.has('Physics') ? null : 'Physics',
       bookmarked: false,
       isCorrect: true,
       userAnswer: 'Because internal forces cancel in equal and opposite pairs, so the total momentum does not change when no external force acts on the system.',
@@ -190,6 +170,7 @@ function buildQuestions(): QuestionItem[] {
     },
     {
       id: 3,
+      sourceKey: 'sample:coding-factorial-base-case',
       title: 'Trace a recursive function',
       prompt: 'Fix the base case so the function returns the factorial of n.',
       category: null,
@@ -202,23 +183,8 @@ function buildQuestions(): QuestionItem[] {
       createdAt: iso(30),
     },
   ]
-}
 
-function buildSkills(): SkillItem[] {
-  return [
-    {
-      id: 1,
-      name: 'exam-coach',
-      description: 'Bias the assistant toward timed-practice feedback and concise remediation steps.',
-      content: '# Exam Coach\n\nAsk the learner to show their intermediate reasoning before revealing the final answer.\n\nPrefer short, timed, checkpoint-style feedback.',
-    },
-    {
-      id: 2,
-      name: 'concept-scaffold',
-      description: 'Slow down explanations and break them into compact concept ladders.',
-      content: '# Concept Scaffold\n\nStart from the prerequisite idea, then move one abstraction level at a time.\n\nEnd each response with a one-line self-check question.',
-    },
-  ]
+  return questions.filter(item => !item.sourceKey || !hiddenSampleQuestionKeys.has(item.sourceKey))
 }
 
 const activeTab = ref<TabKey>('knowledge')
@@ -228,29 +194,16 @@ const createForm = reactive({
   provider: 'llamaindex',
   files: 'syllabus.pdf\nweek-01-slides.pdf\nquiz-bank.md',
 })
-const notebookDraft = reactive({
-  name: '',
-  description: '',
-})
 const categoryDraft = ref('')
 const customQuestionCategories = ref<string[]>([])
 const questionFilter = ref<QuestionFilter>('all')
 const activeQuestionCategory = ref('all')
-const expandedNotebookRecordIds = ref<number[]>([])
-const skillModalVisible = ref(false)
-const skillDraft = reactive({
-  id: null as number | null,
-  name: '',
-  description: '',
-  content: '',
-})
 
 const knowledgeBases = ref<KnowledgeBaseItem[]>(buildKnowledgeBases())
-const notebooks = ref<NotebookItem[]>(buildNotebooks())
-const questionEntries = ref<QuestionItem[]>(buildQuestions())
-const skills = ref<SkillItem[]>(buildSkills())
+const questionEntries = ref<QuestionItem[]>([
+  ...buildQuestions(),
+])
 const selectedKnowledgeBaseId = ref<number | null>(knowledgeBases.value[0]?.id ?? null)
-const selectedNotebookId = ref<number | null>(notebooks.value[0]?.id ?? null)
 const uploadForm = reactive({
   targetId: selectedKnowledgeBaseId.value,
   files: 'week-02-worksheet.pdf\nexam-faq.md',
@@ -291,10 +244,6 @@ const selectedKnowledgeBase = computed(() => {
   return knowledgeBases.value.find(item => item.id === selectedKnowledgeBaseId.value) ?? null
 })
 
-const selectedNotebook = computed(() => {
-  return notebooks.value.find(item => item.id === selectedNotebookId.value) ?? null
-})
-
 const questionCategories = computed(() => {
   const dynamicCategories = questionEntries.value
     .map(item => item.category)
@@ -317,7 +266,6 @@ const filteredQuestions = computed(() => {
 
 const dashboardStats = computed(() => {
   const totalDocuments = knowledgeBases.value.reduce((sum, item) => sum + item.documents, 0)
-  const totalRecords = notebooks.value.reduce((sum, item) => sum + item.records.length, 0)
 
   return [
     {
@@ -328,25 +276,11 @@ const dashboardStats = computed(() => {
       icon: 'knowledge',
     },
     {
-      key: 'notebooks',
-      label: t('knowledge.stats.notebooks'),
-      value: notebooks.value.length,
-      meta: `${totalRecords} ${t('knowledge.notebooks.recordCount')}`,
-      icon: 'notebooks',
-    },
-    {
       key: 'questions',
       label: t('knowledge.stats.questions'),
       value: questionEntries.value.length,
       meta: `${questionEntries.value.filter(item => item.bookmarked).length} ${t('knowledge.questions.bookmarked').toLowerCase()}`,
       icon: 'questions',
-    },
-    {
-      key: 'skills',
-      label: t('knowledge.stats.skills'),
-      value: skills.value.length,
-      meta: t('knowledge.frontendOnly'),
-      icon: 'skills',
     },
   ]
 })
@@ -359,6 +293,52 @@ const questionFilterOptions = computed(() => [
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString()
+}
+
+function numericHash(value: string) {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1)
+    hash = Math.imul(31, hash) + value.charCodeAt(index) | 0
+
+  return Math.abs(hash)
+}
+
+function quizRecordToQuestionItem(record: QuizAnswerHistoryItem): QuestionItem | null {
+  if (!record.sourceKey || !record.question || !record.correctAnswer)
+    return null
+
+  return {
+    id: numericHash(record.sourceKey),
+    sourceKey: record.sourceKey,
+    title: record.question.length > 72 ? `${record.question.slice(0, 72)}...` : record.question,
+    prompt: record.question,
+    category: record.category ?? t('knowledge.questions.generatedCategory'),
+    bookmarked: false,
+    isCorrect: !!record.isCorrect,
+    options: record.options
+      ? Object.entries(record.options).map(([key, text]) => ({ key, text }))
+      : undefined,
+    userAnswer: record.selected || record.typed || '',
+    correctAnswer: record.correctAnswer,
+    explanation: record.explanation || '',
+    sessionTitle: record.sessionTitle || t('knowledge.questions.generatedSessionTitle'),
+    createdAt: new Date(record.createTime || record.updateTime || Date.now()).toISOString(),
+  }
+}
+
+async function syncQuizQuestions() {
+  try {
+    const response = await fetchQuizQuestions()
+    const generatedQuestions = (response.data || [])
+      .map(quizRecordToQuestionItem)
+      .filter((item): item is QuestionItem => item !== null)
+    const sampleQuestions = questionEntries.value.filter(item => item.sourceKey?.startsWith('sample:'))
+
+    questionEntries.value = [...generatedQuestions, ...sampleQuestions]
+  }
+  catch (error) {
+    console.error(error)
+  }
 }
 
 function parseFiles(value: string) {
@@ -460,55 +440,6 @@ function removeKnowledgeBase(id: number) {
   message.success(t('knowledge.messages.deleted'))
 }
 
-function createNotebook() {
-  const name = notebookDraft.name.trim()
-  if (!name)
-    return
-
-  const id = nextId(notebooks.value.map(item => item.id))
-  notebooks.value.unshift({
-    id,
-    name,
-    description: notebookDraft.description.trim() || 'A fresh notebook ready for generated summaries and reusable study prompts.',
-    color: '#4B8F5A',
-    records: [],
-  })
-  selectedNotebookId.value = id
-  notebookDraft.name = ''
-  notebookDraft.description = ''
-  message.success(t('knowledge.messages.notebookCreated'))
-}
-
-function removeNotebook(id: number) {
-  notebooks.value = notebooks.value.filter(item => item.id !== id)
-
-  if (selectedNotebookId.value === id)
-    selectedNotebookId.value = notebooks.value[0]?.id ?? null
-
-  message.success(t('knowledge.messages.notebookDeleted'))
-}
-
-function toggleNotebookRecord(id: number) {
-  expandedNotebookRecordIds.value = expandedNotebookRecordIds.value.includes(id)
-    ? expandedNotebookRecordIds.value.filter(item => item !== id)
-    : [...expandedNotebookRecordIds.value, id]
-}
-
-function removeNotebookRecord(recordId: number) {
-  notebooks.value = notebooks.value.map((item) => {
-    if (item.id !== selectedNotebookId.value)
-      return item
-
-    return {
-      ...item,
-      records: item.records.filter(record => record.id !== recordId),
-    }
-  })
-
-  expandedNotebookRecordIds.value = expandedNotebookRecordIds.value.filter(item => item !== recordId)
-  message.success(t('knowledge.messages.recordDeleted'))
-}
-
 function addQuestionCategory() {
   const name = categoryDraft.value.trim()
   if (!name || questionCategories.value.includes(name))
@@ -520,6 +451,8 @@ function addQuestionCategory() {
 }
 
 function clearQuestionCategory(category: string) {
+  clearSampleCategory(category)
+
   questionEntries.value = questionEntries.value.map((item) => {
     if (item.category !== category)
       return item
@@ -550,63 +483,22 @@ function removeQuestionCategory(id: number) {
     target.category = null
 }
 
-function removeQuestion(id: number) {
+async function removeQuestion(id: number) {
+  const target = questionEntries.value.find(item => item.id === id)
+  if (target?.sourceKey) {
+    if (target.sourceKey.startsWith('sample:'))
+      hideSampleQuestion(target.sourceKey)
+    else
+      await fetchDeleteQuizQuestion(target.sourceKey)
+  }
+
   questionEntries.value = questionEntries.value.filter(item => item.id !== id)
   message.success(t('knowledge.messages.questionDeleted'))
 }
 
-function openCreateSkill() {
-  skillDraft.id = null
-  skillDraft.name = ''
-  skillDraft.description = ''
-  skillDraft.content = '# New Skill\n\nDescribe how the assistant should behave here.'
-  skillModalVisible.value = true
-}
-
-function openEditSkill(skill: SkillItem) {
-  skillDraft.id = skill.id
-  skillDraft.name = skill.name
-  skillDraft.description = skill.description
-  skillDraft.content = skill.content
-  skillModalVisible.value = true
-}
-
-function saveSkill() {
-  const name = skillDraft.name.trim()
-  if (!name)
-    return
-
-  if (skillDraft.id === null) {
-    skills.value.unshift({
-      id: nextId(skills.value.map(item => item.id)),
-      name,
-      description: skillDraft.description.trim(),
-      content: skillDraft.content.trim(),
-    })
-    message.success(t('knowledge.messages.skillCreated'))
-  }
-  else {
-    skills.value = skills.value.map((item) => {
-      if (item.id !== skillDraft.id)
-        return item
-
-      return {
-        ...item,
-        name,
-        description: skillDraft.description.trim(),
-        content: skillDraft.content.trim(),
-      }
-    })
-    message.success(t('knowledge.messages.skillUpdated'))
-  }
-
-  skillModalVisible.value = false
-}
-
-function removeSkill(id: number) {
-  skills.value = skills.value.filter(item => item.id !== id)
-  message.success(t('knowledge.messages.skillDeleted'))
-}
+onMounted(() => {
+  void syncQuizQuestions()
+})
 </script>
 
 <template>
@@ -622,7 +514,7 @@ function removeSkill(id: number) {
             </div>
           </div>
 
-          <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
             <div
               v-for="stat in dashboardStats"
               :key="stat.key"
@@ -633,9 +525,7 @@ function removeSkill(id: number) {
                   {{ stat.label }}
                 </div>
                 <IconRiBookOpenLine v-if="stat.icon === 'knowledge'" class="text-lg text-[var(--dt-primary)]" />
-                <IconRiFileList3Line v-else-if="stat.icon === 'notebooks'" class="text-lg text-[var(--dt-primary)]" />
-                <IconRiQuestionAnswerLine v-else-if="stat.icon === 'questions'" class="text-lg text-[var(--dt-primary)]" />
-                <IconRiSettings4Line v-else class="text-lg text-[var(--dt-primary)]" />
+                <IconRiQuestionAnswerLine v-else class="text-lg text-[var(--dt-primary)]" />
               </div>
               <div class="text-3xl font-semibold tracking-[-0.04em]">
                 {{ stat.value }}
@@ -650,9 +540,7 @@ function removeSkill(id: number) {
         <section class="rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] p-4 shadow-sm sm:p-5">
           <NTabs v-model:value="activeTab" type="segment" animated>
             <NTabPane name="knowledge" :tab="t('knowledge.tabs.knowledge')" />
-            <NTabPane name="notebooks" :tab="t('knowledge.tabs.notebooks')" />
             <NTabPane name="questions" :tab="t('knowledge.tabs.questions')" />
-            <NTabPane name="skills" :tab="t('knowledge.tabs.skills')" />
           </NTabs>
 
           <div v-if="activeTab === 'knowledge'" class="mt-5 grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -890,149 +778,6 @@ function removeSkill(id: number) {
             </div>
           </div>
 
-          <div v-else-if="activeTab === 'notebooks'" class="mt-5 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <aside class="knowledge-shell__panel">
-              <div class="mb-4">
-                <p class="text-sm font-semibold">
-                  {{ t('knowledge.notebooks.title') }}
-                </p>
-                <p class="mt-1 text-xs leading-5 text-[var(--dt-muted-foreground)]">
-                  {{ t('knowledge.notebooks.description') }}
-                </p>
-              </div>
-
-              <div class="space-y-3 rounded-2xl bg-[var(--dt-muted)] p-4">
-                <label class="knowledge-label">{{ t('knowledge.notebooks.createTitle') }}</label>
-                <NInput v-model:value="notebookDraft.name" :placeholder="t('knowledge.notebooks.namePlaceholder')" />
-                <NInput
-                  v-model:value="notebookDraft.description"
-                  type="textarea"
-                  :autosize="{ minRows: 3 }"
-                  :placeholder="t('knowledge.notebooks.descriptionPlaceholder')"
-                />
-                <NButton block type="primary" @click="createNotebook">
-                  <template #icon>
-                    <IconRiAddLine />
-                  </template>
-                  {{ t('knowledge.notebooks.createTitle') }}
-                </NButton>
-              </div>
-
-              <div class="mt-4 space-y-3">
-                <button
-                  v-for="item in notebooks"
-                  :key="item.id"
-                  class="knowledge-list-card w-full rounded-2xl border p-4 text-left transition-all duration-200"
-                  :class="item.id === selectedNotebookId ? 'knowledge-list-card--active' : ''"
-                  @click="selectedNotebookId = item.id"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm font-semibold">
-                        {{ item.name }}
-                      </p>
-                      <p class="mt-2 text-xs leading-5 text-[var(--dt-muted-foreground)]">
-                        {{ item.description }}
-                      </p>
-                    </div>
-                    <NPopconfirm @positive-click="removeNotebook(item.id)">
-                      <template #trigger>
-                        <NButton text type="error">
-                          <IconRiDeleteBinLine />
-                        </NButton>
-                      </template>
-                      {{ t('common.confirm') }}
-                    </NPopconfirm>
-                  </div>
-                  <div class="mt-4 text-xs text-[var(--dt-muted-foreground)]">
-                    {{ item.records.length }} {{ t('knowledge.notebooks.recordCount') }}
-                  </div>
-                </button>
-              </div>
-            </aside>
-
-            <section class="knowledge-shell__panel">
-              <div v-if="selectedNotebook" class="flex flex-col gap-4">
-                <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <h2 class="text-xl font-semibold tracking-[-0.03em]">
-                      {{ selectedNotebook.name }}
-                    </h2>
-                    <p class="mt-2 text-sm leading-6 text-[var(--dt-muted-foreground)]">
-                      {{ selectedNotebook.description }}
-                    </p>
-                  </div>
-                  <NTag round size="small">
-                    {{ selectedNotebook.records.length }} {{ t('knowledge.notebooks.recordCount') }}
-                  </NTag>
-                </div>
-
-                <div v-if="selectedNotebook.records.length" class="space-y-3">
-                  <article
-                    v-for="record in selectedNotebook.records"
-                    :key="record.id"
-                    class="rounded-2xl border border-[var(--dt-border)] bg-[var(--dt-muted)]/40 p-4"
-                  >
-                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <p class="text-sm font-semibold">
-                            {{ record.title }}
-                          </p>
-                          <NTag size="small" type="success">
-                            {{ record.type }}
-                          </NTag>
-                        </div>
-                        <p class="mt-2 text-sm leading-6 text-[var(--dt-muted-foreground)]">
-                          {{ record.summary }}
-                        </p>
-                      </div>
-
-                      <div class="flex flex-wrap gap-2">
-                        <NButton text @click="toggleNotebookRecord(record.id)">
-                          <template #icon>
-                            <IconRiArrowDownSLine
-                              class="transition-transform"
-                              :class="expandedNotebookRecordIds.includes(record.id) ? '' : '-rotate-90'"
-                            />
-                          </template>
-                          {{ expandedNotebookRecordIds.includes(record.id) ? t('knowledge.notebooks.collapse') : t('knowledge.notebooks.expand') }}
-                        </NButton>
-
-                        <NPopconfirm @positive-click="removeNotebookRecord(record.id)">
-                          <template #trigger>
-                            <NButton text type="error">
-                              <template #icon>
-                                <IconRiDeleteBinLine />
-                              </template>
-                              {{ t('common.delete') }}
-                            </NButton>
-                          </template>
-                          {{ t('common.confirm') }}
-                        </NPopconfirm>
-                      </div>
-                    </div>
-
-                    <div
-                      v-if="expandedNotebookRecordIds.includes(record.id)"
-                      class="mt-4 rounded-2xl bg-[var(--dt-background)] px-4 py-3 text-sm leading-6 text-[var(--dt-foreground)]"
-                    >
-                      {{ record.output }}
-                    </div>
-
-                    <div class="mt-3 text-xs text-[var(--dt-muted-foreground)]">
-                      {{ formatTimestamp(record.updatedAt) }}
-                    </div>
-                  </article>
-                </div>
-
-                <NEmpty v-else :description="t('knowledge.notebooks.noRecords')" class="py-12" />
-              </div>
-
-              <NEmpty v-else :description="t('knowledge.notebooks.selectNotebook')" class="py-16" />
-            </section>
-          </div>
-
           <div v-else-if="activeTab === 'questions'" class="mt-5 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
             <aside class="knowledge-shell__panel">
               <div class="mb-4">
@@ -1221,124 +966,9 @@ function removeSkill(id: number) {
               <NEmpty v-else :description="t('knowledge.questions.noQuestions')" class="py-16" />
             </section>
           </div>
-
-          <div v-else class="mt-5 space-y-4">
-            <section class="knowledge-shell__panel">
-              <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p class="text-sm font-semibold">
-                    {{ t('knowledge.skills.title') }}
-                  </p>
-                  <p class="mt-1 text-xs leading-5 text-[var(--dt-muted-foreground)]">
-                    {{ t('knowledge.skills.description') }}
-                  </p>
-                </div>
-
-                <NButton type="primary" @click="openCreateSkill">
-                  <template #icon>
-                    <IconRiAddLine />
-                  </template>
-                  {{ t('knowledge.skills.newSkill') }}
-                </NButton>
-              </div>
-
-              <div v-if="skills.length" class="mt-5 grid gap-4 lg:grid-cols-2">
-                <article
-                  v-for="skill in skills"
-                  :key="skill.id"
-                  class="rounded-2xl border border-[var(--dt-border)] bg-[var(--dt-muted)]/40 p-5"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1">
-                      <h3 class="truncate text-base font-semibold">
-                        {{ skill.name }}
-                      </h3>
-                      <p class="mt-2 text-sm leading-6 text-[var(--dt-muted-foreground)]">
-                        {{ skill.description }}
-                      </p>
-                    </div>
-
-                    <div class="flex gap-1">
-                      <NButton text @click="openEditSkill(skill)">
-                        <template #icon>
-                          <IconRiEditLine />
-                        </template>
-                      </NButton>
-                      <NPopconfirm @positive-click="removeSkill(skill.id)">
-                        <template #trigger>
-                          <NButton text type="error">
-                            <template #icon>
-                              <IconRiDeleteBinLine />
-                            </template>
-                          </NButton>
-                        </template>
-                        {{ t('common.confirm') }}
-                      </NPopconfirm>
-                    </div>
-                  </div>
-
-                  <pre class="mt-4 overflow-x-auto rounded-2xl bg-[var(--dt-background)] p-4 text-xs leading-6 text-[var(--dt-muted-foreground)]">{{ skill.content }}</pre>
-                </article>
-              </div>
-
-              <NEmpty v-else :description="t('knowledge.skills.noSkills')" class="py-16" />
-            </section>
-          </div>
         </section>
       </section>
     </main>
-
-    <NModal v-model:show="skillModalVisible" :mask-closable="false">
-      <div class="knowledge-modal mx-auto mt-[8vh] w-[min(720px,calc(100vw-2rem))] rounded-3xl border border-[var(--dt-border)] bg-[var(--dt-secondary)] shadow-2xl">
-        <div class="flex items-center justify-between border-b border-[var(--dt-border)] px-5 py-4">
-          <div>
-            <p class="text-base font-semibold">
-              {{ skillDraft.id === null ? t('knowledge.skills.newSkill') : t('knowledge.skills.editSkill') }}
-            </p>
-            <p class="mt-1 text-xs text-[var(--dt-muted-foreground)]">
-              {{ t('knowledge.frontendOnly') }}
-            </p>
-          </div>
-
-          <NButton text @click="skillModalVisible = false">
-            <template #icon>
-              <IconRiCloseCircleLine />
-            </template>
-          </NButton>
-        </div>
-
-        <div class="space-y-4 px-5 py-5">
-          <div>
-            <label class="knowledge-label">{{ t('knowledge.nameLabel') }}</label>
-            <NInput v-model:value="skillDraft.name" :placeholder="t('knowledge.skills.namePlaceholder')" />
-          </div>
-
-          <div>
-            <label class="knowledge-label">{{ t('setting.description') }}</label>
-            <NInput v-model:value="skillDraft.description" :placeholder="t('knowledge.skills.descriptionPlaceholder')" />
-          </div>
-
-          <div>
-            <label class="knowledge-label">{{ t('knowledge.skills.bodyLabel') }}</label>
-            <NInput
-              v-model:value="skillDraft.content"
-              type="textarea"
-              :autosize="{ minRows: 12 }"
-              :placeholder="t('knowledge.skills.bodyPlaceholder')"
-            />
-          </div>
-        </div>
-
-        <div class="flex items-center justify-end gap-2 border-t border-[var(--dt-border)] px-5 py-4">
-          <NButton @click="skillModalVisible = false">
-            {{ t('knowledge.cancel') }}
-          </NButton>
-          <NButton type="primary" @click="saveSkill">
-            {{ t('common.save') }}
-          </NButton>
-        </div>
-      </div>
-    </NModal>
   </div>
 </template>
 

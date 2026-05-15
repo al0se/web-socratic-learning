@@ -246,17 +246,40 @@ export class ChatUsage {
   }
 }
 
-export class QuizAnswerHistory {
+export interface QuizQuestionSnapshot {
+  question: string
+  questionType: 'choice' | 'written'
+  options?: Record<string, string>
+  correctAnswer: string
+  explanation: string
+  difficulty?: string
+  concentration?: string
+  knowledgeContext?: string
+}
+
+export class Quiz {
   _id: ObjectId
   userId: string
   roomId: number
   chatUuid: number
+  sourceKey: string
   questionId: string
   questionIndex: number
+  question: string
+  questionType: 'choice' | 'written'
+  options?: Record<string, string>
+  correctAnswer: string
+  explanation: string
+  difficulty?: string
+  concentration?: string
+  knowledgeContext?: string
+  category?: string | null
+  sessionTitle?: string
   selected?: string | null
   typed: string
   submitted: boolean
   isCorrect?: boolean | null
+  status: Status
   createTime: number
   updateTime: number
 
@@ -264,8 +287,12 @@ export class QuizAnswerHistory {
     userId: string,
     roomId: number,
     chatUuid: number,
+    sourceKey: string,
     questionId: string,
     questionIndex: number,
+    questionSnapshot: QuizQuestionSnapshot,
+    category?: string | null,
+    sessionTitle?: string,
     selected?: string | null,
     typed = '',
     submitted = false,
@@ -275,12 +302,24 @@ export class QuizAnswerHistory {
     this.userId = userId
     this.roomId = roomId
     this.chatUuid = chatUuid
+    this.sourceKey = sourceKey
     this.questionId = questionId
     this.questionIndex = questionIndex
+    this.question = questionSnapshot.question
+    this.questionType = questionSnapshot.questionType
+    this.options = questionSnapshot.options
+    this.correctAnswer = questionSnapshot.correctAnswer
+    this.explanation = questionSnapshot.explanation
+    this.difficulty = questionSnapshot.difficulty
+    this.concentration = questionSnapshot.concentration
+    this.knowledgeContext = questionSnapshot.knowledgeContext
+    this.category = category ?? null
+    this.sessionTitle = sessionTitle
     this.selected = selected ?? null
     this.typed = typed
     this.submitted = submitted
     this.isCorrect = isCorrect ?? null
+    this.status = Status.Normal
     this.createTime = now
     this.updateTime = now
   }

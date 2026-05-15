@@ -12,8 +12,45 @@ def read_request() -> dict:
     return json.loads(raw)
 
 
+def sanitize_text(value: str) -> str:
+    return value.encode("utf-8", errors="replace").decode("utf-8")
+
+
+def sanitize_payload(value):
+    if isinstance(value, str):
+        return sanitize_text(value)
+    if isinstance(value, list):
+        return [sanitize_payload(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            sanitize_payload(key) if isinstance(key, str) else key: sanitize_payload(item)
+            for key, item in value.items()
+        }
+    return value
+
+
+def install_safe_json_dumps() -> None:
+    original_dumps = json.dumps
+
+    def safe_dumps(*args, **kwargs):
+        result = original_dumps(*args, **kwargs)
+        if kwargs.get("ensure_ascii") is False and isinstance(result, str):
+            return sanitize_text(result)
+        return result
+
+    json.dumps = safe_dumps
+
+
+def get_env(*names: str, default=None):
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return default
+
+
 def write_response(payload: dict) -> None:
-    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    data = json.dumps(sanitize_payload(payload), ensure_ascii=False).encode("utf-8")
     sys.stdout.buffer.write(data)
     sys.stdout.flush()
 
@@ -26,12 +63,12 @@ async def build_llm_func():
         if keyword_extraction:
             kwargs["response_format"] = GPTKeywordExtractionFormat
         return await openai_complete_if_cache(
-            os.getenv("LLM_MODEL", "gpt-4o-mini"),
+            get_env("LLM_MODEL", default="gpt-4o-mini"),
             prompt,
             system_prompt=system_prompt,
             history_messages=history_messages or [],
-            base_url=os.getenv("LLM_BINDING_HOST"),
-            api_key=os.getenv("LLM_BINDING_API_KEY"),
+            base_url=get_env("LLM_BINDING_HOST", "OPENAI_API_BASE_URL"),
+            api_key=get_env("LLM_BINDING_API_KEY", "OPENAI_API_KEY"),
             **kwargs,
         )
 
@@ -50,15 +87,16 @@ def build_embedding_func():
         max_token_size=max_token_size,
         func=partial(
             openai_embed.func,
-            model=os.getenv("EMBEDDING_MODEL"),
-            base_url=os.getenv("EMBEDDING_BINDING_HOST"),
-            api_key=os.getenv("EMBEDDING_BINDING_API_KEY"),
+            model=get_env("EMBEDDING_MODEL", default="text-embedding-3-large"),
+            base_url=get_env("EMBEDDING_BINDING_HOST", "OPENAI_API_BASE_URL"),
+            api_key=get_env("EMBEDDING_BINDING_API_KEY", "OPENAI_API_KEY"),
             embedding_dim=embedding_dim,
         ),
     )
 
 
 async def main():
+    install_safe_json_dumps()
     request = read_request()
 
     repo_dir = request["repoDir"]

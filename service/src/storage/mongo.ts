@@ -7,6 +7,7 @@ import type {
   KeyConfig,
   KnowledgeGraphStatus,
   MemoryFile,
+  QuizQuestionSnapshot,
   SearchResult,
   UsageResponse,
   UserPrompt,
@@ -18,7 +19,7 @@ import { DEFAULT_ROOM_PROMPT } from '../utils'
 import { hasAnyRole } from '../utils/is'
 import { md5 } from '../utils/security'
 import { getCacheApiKeys, getCacheConfig } from './config'
-import { ChatInfo, ChatRoom, ChatUsage, MemoryInfo, QuizAnswerHistory, Status, UserConfig, UserInfo, UserRole } from './model'
+import { ChatInfo, ChatRoom, ChatUsage, MemoryInfo, Quiz, Status, UserConfig, UserInfo, UserRole } from './model'
 
 let client: MongoClient
 let dbName: string
@@ -34,7 +35,7 @@ let keyCol: Collection<KeyConfig>
 let userPromptCol: Collection<UserPrompt>
 let redeemCol: Collection<GiftCard>
 let memoryCol: Collection<MemoryInfo>
-let quizAnswerCol: Collection<QuizAnswerHistory>
+let quizCol: Collection<Quiz>
 
 /**
  * Initialize all database indexes
@@ -176,18 +177,23 @@ async function initializeIndexes() {
     globalThis.console.log('memory collection indexes created')
 
     // ============================================
-    // quiz_answer_history collection indexes
+    // quiz collection indexes
     // ============================================
-    await quizAnswerCol.createIndex(
-      { userId: 1, roomId: 1, chatUuid: 1 },
-      { name: 'idx_userId_roomId_chatUuid' },
+    await quizCol.createIndex(
+      { userId: 1, status: 1, createTime: -1 },
+      { name: 'idx_userId_status_createTime' },
     )
-    await quizAnswerCol.createIndex(
+    await quizCol.createIndex(
+      { userId: 1, roomId: 1, chatUuid: 1, status: 1 },
+      { name: 'idx_userId_roomId_chatUuid_status' },
+    )
+    await quizCol.createIndex(
       { userId: 1, roomId: 1, chatUuid: 1, questionId: 1, questionIndex: 1 },
-      { name: 'uidx_quiz_answer', unique: true },
+      { name: 'uidx_quiz_question', unique: true },
     )
+    await quizCol.createIndex({ userId: 1, sourceKey: 1 }, { name: 'uidx_userId_sourceKey', unique: true })
 
-    globalThis.console.log('quiz_answer_history collection indexes created')
+    globalThis.console.log('quiz collection indexes created')
 
     globalThis.console.log('All database indexes initialized successfully')
   }
@@ -233,7 +239,7 @@ export async function initializeMongoDB() {
     userPromptCol = db.collection<UserPrompt>('user_prompt')
     redeemCol = db.collection<GiftCard>('giftcards')
     memoryCol = db.collection<MemoryInfo>('memory')
-    quizAnswerCol = db.collection<QuizAnswerHistory>('quiz_answer_history')
+    quizCol = db.collection<Quiz>('quiz')
 
     // Initialize indexes
     await initializeIndexes()
@@ -409,13 +415,79 @@ export async function insertChatUsage(userId: ObjectId, roomId: number, chatId: 
 }
 
 export async function getQuizAnswerHistory(userId: string, roomId: number, chatUuid: number) {
-  return await quizAnswerCol
-    .find({ userId, roomId, chatUuid })
+  return await quizCol
+    .find({ userId, roomId, chatUuid, status: { $ne: Status.Deleted } })
     .sort({ questionIndex: 1 })
     .toArray()
 }
 
-export async function upsertQuizAnswerHistory(
+export async function getQuizQuestions(userId: string) {
+  return await quizCol
+    .find({ userId, status: { $ne: Status.Deleted } })
+    .sort({ createTime: -1, questionIndex: 1 })
+    .toArray()
+}
+
+export async function upsertQuizQuestion(
+  userId: string,
+  roomId: number,
+  chatUuid: number,
+  sourceKey: string,
+  questionId: string,
+  questionIndex: number,
+  questionSnapshot: QuizQuestionSnapshot,
+  category?: string | null,
+  sessionTitle?: string,
+) {
+  const now = new Date().getTime()
+  const quiz = new Quiz(
+    userId,
+    roomId,
+    chatUuid,
+    sourceKey,
+    questionId,
+    questionIndex,
+    questionSnapshot,
+    category,
+    sessionTitle,
+  )
+
+  await quizCol.updateOne(
+    { userId, roomId, chatUuid, questionId, questionIndex },
+    {
+      $set: {
+        sourceKey: quiz.sourceKey,
+        question: quiz.question,
+        questionType: quiz.questionType,
+        options: quiz.options,
+        correctAnswer: quiz.correctAnswer,
+        explanation: quiz.explanation,
+        difficulty: quiz.difficulty,
+        concentration: quiz.concentration,
+        knowledgeContext: quiz.knowledgeContext,
+        category: quiz.category,
+        sessionTitle: quiz.sessionTitle,
+        status: Status.Normal,
+        updateTime: now,
+      },
+      $setOnInsert: {
+        userId,
+        roomId,
+        chatUuid,
+        questionId,
+        questionIndex,
+        selected: null,
+        typed: '',
+        submitted: false,
+        isCorrect: null,
+        createTime: now,
+      },
+    },
+    { upsert: true },
+  )
+}
+
+export async function upsertQuizAnswer(
   userId: string,
   roomId: number,
   chatUuid: number,
@@ -427,39 +499,23 @@ export async function upsertQuizAnswerHistory(
   isCorrect: boolean | null,
 ) {
   const now = new Date().getTime()
-  const answer = new QuizAnswerHistory(
-    userId,
-    roomId,
-    chatUuid,
-    questionId,
-    questionIndex,
-    selected,
-    typed,
-    submitted,
-    isCorrect,
-  )
 
-  await quizAnswerCol.updateOne(
+  await quizCol.updateOne(
     { userId, roomId, chatUuid, questionId, questionIndex },
     {
       $set: {
-        selected: answer.selected,
-        typed: answer.typed,
-        submitted: answer.submitted,
-        isCorrect: answer.isCorrect,
+        selected: selected ?? null,
+        typed,
+        submitted,
+        isCorrect: isCorrect ?? null,
         updateTime: now,
       },
-      $setOnInsert: {
-        userId,
-        roomId,
-        chatUuid,
-        questionId,
-        questionIndex,
-        createTime: now,
-      },
     },
-    { upsert: true },
   )
+}
+
+export async function deleteQuizQuestion(userId: string, sourceKey: string) {
+  await quizCol.updateOne({ userId, sourceKey }, { $set: { status: Status.Deleted, updateTime: new Date().getTime() } })
 }
 
 export async function createChatRoom(
@@ -796,7 +852,7 @@ export async function clearChat(roomId: number) {
     },
   }
   await chatCol.updateMany(query, update)
-  await quizAnswerCol.deleteMany({ roomId })
+  await quizCol.deleteMany({ roomId })
 }
 
 export async function deleteChat(roomId: number, uuid: number, inversion: boolean) {
@@ -824,7 +880,7 @@ export async function deleteChat(roomId: number, uuid: number, inversion: boolea
     }
   }
   await chatCol.updateOne(query, update)
-  await quizAnswerCol.deleteMany({ roomId, chatUuid: uuid })
+  await quizCol.deleteMany({ roomId, chatUuid: uuid })
 }
 
 // Add useAmount and limit_switch in createUser/updateUserInfo.

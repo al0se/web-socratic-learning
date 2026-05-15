@@ -20,12 +20,24 @@ export interface MemoryResponse extends MemorySnapshot {
 export interface QuizAnswerHistoryItem {
   roomId: number
   chatUuid: number
+  sourceKey?: string
   questionId: string
   questionIndex: number
+  question?: string
+  questionType?: 'choice' | 'written'
+  options?: Record<string, string>
+  correctAnswer?: string
+  explanation?: string
+  difficulty?: string
+  concentration?: string
+  knowledgeContext?: string
+  category?: string | null
+  sessionTitle?: string
   selected: string | null
   typed: string
   submitted: boolean
   isCorrect: boolean | null
+  createTime?: number
   updateTime?: number
 }
 
@@ -70,14 +82,27 @@ export function fetchClearMemory<T = MemoryResponse>(file?: MemoryFile) {
 
 export function fetchQuizAnswerHistory<T = QuizAnswerHistoryItem[]>(roomId: number, chatUuid: number) {
   return get<T>({
-    url: `/quiz-answer-history?roomId=${roomId}&chatUuid=${chatUuid}`,
+    url: `/quiz?roomId=${roomId}&chatUuid=${chatUuid}`,
   })
 }
 
 export function fetchSaveQuizAnswerHistory<T = any>(payload: Omit<QuizAnswerHistoryItem, 'updateTime'>) {
   return post<T>({
-    url: '/quiz-answer-history',
+    url: '/quiz',
     data: payload,
+  })
+}
+
+export function fetchQuizQuestions<T = QuizAnswerHistoryItem[]>() {
+  return get<T>({
+    url: '/quiz',
+  })
+}
+
+export function fetchDeleteQuizQuestion<T = any>(sourceKey: string) {
+  return post<T>({
+    url: '/quiz-delete',
+    data: { sourceKey },
   })
 }
 

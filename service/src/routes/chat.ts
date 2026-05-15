@@ -1,5 +1,5 @@
 import type { ResponseChunk } from '../chatgpt/types'
-import type { ChatInfo, ChatOptions, ImageUsageItem, UsageResponse, UserInfo } from '../storage/model'
+import type { ChatInfo, ChatOptions, ImageUsageItem, QuizQuestionSnapshot, UsageResponse, UserInfo } from '../storage/model'
 import type { QuizConfig, RequestProps } from '../types'
 import * as console from 'node:console'
 import * as process from 'node:process'
@@ -15,21 +15,174 @@ import {
   clearChat,
   deleteAllChatRooms,
   deleteChat,
+  deleteQuizQuestion,
   existsChatRoom,
   getChat,
   getChatRoom,
   getChats,
   getQuizAnswerHistory,
+  getQuizQuestions,
   getUserById,
   insertChat,
   insertChatUsage,
   updateAmountMinusOne,
   updateChat,
-  upsertQuizAnswerHistory,
+  upsertQuizAnswer,
+  upsertQuizQuestion,
 } from '../storage/mongo'
 import { isNotEmptyString } from '../utils/is'
 
 export const router = Router()
+
+interface ParsedQuizQuestion extends QuizQuestionSnapshot {
+  questionId: string
+}
+
+function normalizeQuizQuestionType(value: unknown): 'choice' | 'written' {
+  const type = String(value || '').toLowerCase()
+  return type === 'choice' || type === 'multiple_choice' ? 'choice' : 'written'
+}
+
+function normalizeQuizQuestionOptions(value: unknown): Record<string, string> | undefined {
+  if (!value)
+    return undefined
+
+  if (Array.isArray(value)) {
+    const entries = value
+      .map((item, index) => [String.fromCharCode(65 + index), String(item)] as const)
+      .filter(([, text]) => text.trim())
+    return entries.length ? Object.fromEntries(entries) : undefined
+  }
+
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .map(([key, text]) => [key.toUpperCase(), String(text)] as const)
+      .filter(([, text]) => text.trim())
+    return entries.length ? Object.fromEntries(entries) : undefined
+  }
+
+  return undefined
+}
+
+function parseQuizJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value)
+  }
+  catch {
+    return null
+  }
+}
+
+function collectQuizJsonCandidates(text: string) {
+  const candidates = [text.trim()]
+  const fenceParts = text.split('```')
+  for (let index = 1; index < fenceParts.length; index += 2) {
+    const rawBlock = fenceParts[index].trim()
+    const block = rawBlock.toLowerCase().startsWith('json')
+      ? rawBlock.slice(4).trim()
+      : rawBlock
+    if (block)
+      candidates.push(block)
+  }
+
+  const firstBrace = text.indexOf('{')
+  const lastBrace = text.lastIndexOf('}')
+  if (firstBrace >= 0 && lastBrace > firstBrace)
+    candidates.push(text.slice(firstBrace, lastBrace + 1))
+
+  const firstBracket = text.indexOf('[')
+  const lastBracket = text.lastIndexOf(']')
+  if (firstBracket >= 0 && lastBracket > firstBracket)
+    candidates.push(text.slice(firstBracket, lastBracket + 1))
+
+  return candidates
+}
+
+function extractQuizQuestions(text: string | undefined): ParsedQuizQuestion[] {
+  if (!text)
+    return []
+
+  for (const candidate of collectQuizJsonCandidates(text)) {
+    const parsed = parseQuizJson(candidate)
+    if (!parsed)
+      continue
+
+    const root = parsed as Record<string, unknown>
+    const summary = root.summary as Record<string, unknown> | undefined
+    const rawQuestions = Array.isArray(parsed)
+      ? parsed as Record<string, unknown>[]
+      : Array.isArray(root.questions)
+        ? root.questions as Record<string, unknown>[]
+        : Array.isArray(summary?.results)
+          ? summary.results as Record<string, unknown>[]
+          : []
+
+    const questions = rawQuestions
+      .map((item, index) => {
+        const qa = ((item.qa_pair ?? item) || {}) as Record<string, unknown>
+        const question = String(qa.question ?? '').trim()
+        if (!question)
+          return null
+
+        const parsedQuestion: ParsedQuizQuestion = {
+          questionId: String(qa.question_id ?? `q_${index + 1}`),
+          question,
+          questionType: normalizeQuizQuestionType(qa.question_type),
+          options: normalizeQuizQuestionOptions(qa.options),
+          correctAnswer: String(qa.correct_answer ?? '').trim(),
+          explanation: String(qa.explanation ?? '').trim(),
+          difficulty: qa.difficulty ? String(qa.difficulty) : undefined,
+          concentration: qa.concentration ? String(qa.concentration) : undefined,
+          knowledgeContext:
+            qa.metadata && typeof qa.metadata === 'object' && 'knowledge_context' in qa.metadata
+              ? String((qa.metadata as Record<string, unknown>).knowledge_context ?? '')
+              : undefined,
+        }
+        return parsedQuestion
+      })
+      .filter((item): item is ParsedQuizQuestion => item !== null)
+
+    if (questions.length)
+      return questions
+  }
+
+  return []
+}
+
+function hashQuizText(value: string) {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1)
+    hash = Math.imul(31, hash) + value.charCodeAt(index) | 0
+
+  return Math.abs(hash).toString(36)
+}
+
+function quizQuestionStorageKey(questionId: string, question: string) {
+  return `${questionId}:${hashQuizText(question)}`
+}
+
+function quizSourceKey(roomId: number, chatUuid: number, questionIndex: number, questionStorageKey: string) {
+  return `${roomId}:${chatUuid}:${questionIndex}:${questionStorageKey}`
+}
+
+async function persistQuizQuestions(userId: string, roomId: number, chatUuid: number, text: string | undefined) {
+  const questions = extractQuizQuestions(text)
+  await Promise.all(questions.map((question, index) => {
+    const { questionId, ...snapshot } = question
+    const questionStorageKey = quizQuestionStorageKey(questionId, question.question)
+    return upsertQuizQuestion(
+      userId,
+      roomId,
+      chatUuid,
+      quizSourceKey(roomId, chatUuid, index, questionStorageKey),
+      questionStorageKey,
+      index,
+      snapshot,
+      null,
+      '',
+    )
+  }))
+}
 
 router.get('/chat-history', auth, async (req, res) => {
   try {
@@ -243,7 +396,57 @@ router.get('/quiz-answer-history', auth, async (req, res) => {
   }
 })
 
-router.post('/quiz-answer-history', auth, async (req, res) => {
+router.get('/quiz', auth, async (req, res) => {
+  try {
+    const userId = req.headers.userId as string
+    const roomId = req.query.roomId ? +req.query.roomId : null
+    const chatUuid = req.query.chatUuid ? +req.query.chatUuid : null
+
+    if (roomId && chatUuid && !await existsChatRoom(userId, roomId)) {
+      res.send({ status: 'Success', message: null, data: [] })
+      return
+    }
+
+    const records = roomId && chatUuid
+      ? await getQuizAnswerHistory(userId, roomId, chatUuid)
+      : await getQuizQuestions(userId)
+
+    res.send({
+      status: 'Success',
+      message: null,
+      data: records.map(record => ({
+        id: record._id?.toString(),
+        roomId: record.roomId,
+        chatUuid: record.chatUuid,
+        sourceKey: record.sourceKey,
+        questionId: record.questionId,
+        questionIndex: record.questionIndex,
+        question: record.question,
+        questionType: record.questionType,
+        options: record.options,
+        correctAnswer: record.correctAnswer,
+        explanation: record.explanation,
+        difficulty: record.difficulty,
+        concentration: record.concentration,
+        knowledgeContext: record.knowledgeContext,
+        category: record.category ?? null,
+        sessionTitle: record.sessionTitle || '',
+        selected: record.selected ?? null,
+        typed: record.typed || '',
+        submitted: !!record.submitted,
+        isCorrect: record.isCorrect ?? null,
+        createTime: record.createTime,
+        updateTime: record.updateTime,
+      })),
+    })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Load error', data: [] })
+  }
+})
+
+async function saveQuizAnswer(req: any, res: any) {
   try {
     const userId = req.headers.userId as string
     const {
@@ -271,7 +474,7 @@ router.post('/quiz-answer-history', auth, async (req, res) => {
       return
     }
 
-    await upsertQuizAnswerHistory(
+    await upsertQuizAnswer(
       userId,
       Number(roomId),
       Number(chatUuid),
@@ -288,7 +491,31 @@ router.post('/quiz-answer-history', auth, async (req, res) => {
     console.error(error)
     res.send({ status: 'Fail', message: 'Save error', data: null })
   }
-})
+}
+
+router.post('/quiz', auth, saveQuizAnswer)
+router.post('/quiz-answer-history', auth, saveQuizAnswer)
+
+async function deleteQuiz(req: any, res: any) {
+  try {
+    const userId = req.headers.userId as string
+    const sourceKey = String(req.body?.sourceKey || '')
+    if (!sourceKey) {
+      res.send({ status: 'Fail', message: 'Invalid quiz question', data: null })
+      return
+    }
+
+    await deleteQuizQuestion(userId, sourceKey)
+    res.send({ status: 'Success', message: null, data: null })
+  }
+  catch (error) {
+    console.error(error)
+    res.send({ status: 'Fail', message: 'Delete error', data: null })
+  }
+}
+
+router.delete('/quiz', auth, deleteQuiz)
+router.post('/quiz-delete', auth, deleteQuiz)
 
 router.post('/chat-delete', auth, async (req, res) => {
   try {
@@ -568,6 +795,15 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
                   editImageId,
                   isImageGeneration, // 生图时更新完成时间
                 )
+              }
+
+              if (message.options?.clientMode === 'quiz') {
+                try {
+                  await persistQuizQuestions(userId, roomId, uuid, result.data.text)
+                }
+                catch (quizError) {
+                  globalThis.console.error('Failed to persist quiz questions:', quizError)
+                }
               }
 
               if (result.data.detail?.usage) {
